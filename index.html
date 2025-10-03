@@ -8,6 +8,11 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
     <style>
         body {
             margin: 0;
@@ -21,6 +26,20 @@
 
     <script type="text/babel" data-type="module">
         const { useState, useEffect } = React;
+
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCy18JxgaB2P-mL-WeKu36XSzykhYi-ypY",
+            authDomain: "schoonmaak-tracker.firebaseapp.com",
+            databaseURL: "https://schoonmaak-tracker-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "schoonmaak-tracker",
+            storageBucket: "schoonmaak-tracker.firebasestorage.app",
+            messagingSenderId: "276714806125",
+            appId: "1:276714806125:web:4394e4d2412905c81e9864"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
 
         // Simple icon components using SVG
         const Check = ({ size = 24, className = "" }) => (
@@ -106,37 +125,75 @@
             });
 
             const [showClearConfirm, setShowClearConfirm] = useState(false);
+            const [trackedWeek, setTrackedWeek] = useState(getWeekNumber(new Date()));
+            const [isLoading, setIsLoading] = useState(true);
 
-            const [trackedWeek, setTrackedWeek] = useState(() => {
-                const saved = localStorage.getItem('trackedWeek');
-                return saved ? parseInt(saved) : getWeekNumber(new Date());
-            });
-
+            // Load data from Firebase and set up real-time listeners
             useEffect(() => {
-                const savedTasks = localStorage.getItem('cleaningTasks');
-                const savedHistory = localStorage.getItem('cleaningHistory');
-                const savedAssignments = localStorage.getItem('manualAssignments');
-                
-                if (savedTasks) setTasks(JSON.parse(savedTasks));
-                if (savedHistory) setHistory(JSON.parse(savedHistory));
-                if (savedAssignments) setManualAssignments(JSON.parse(savedAssignments));
+                // Listen to tasks
+                const tasksRef = database.ref('tasks');
+                tasksRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        setTasks(data);
+                    }
+                    setIsLoading(false);
+                });
+
+                // Listen to history
+                const historyRef = database.ref('history');
+                historyRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        setHistory(data);
+                    } else {
+                        setHistory([]);
+                    }
+                });
+
+                // Listen to manual assignments
+                const assignmentsRef = database.ref('manualAssignments');
+                assignmentsRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        setManualAssignments(data);
+                    }
+                });
+
+                // Listen to tracked week
+                const weekRef = database.ref('trackedWeek');
+                weekRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        setTrackedWeek(data);
+                    }
+                });
+
+                // Cleanup listeners on unmount
+                return () => {
+                    tasksRef.off();
+                    historyRef.off();
+                    assignmentsRef.off();
+                    weekRef.off();
+                };
             }, []);
 
-            useEffect(() => {
-                localStorage.setItem('cleaningTasks', JSON.stringify(tasks));
-            }, [tasks]);
+            // Update Firebase when state changes
+            const updateTasks = (newTasks) => {
+                database.ref('tasks').set(newTasks);
+            };
 
-            useEffect(() => {
-                localStorage.setItem('cleaningHistory', JSON.stringify(history));
-            }, [history]);
+            const updateHistory = (newHistory) => {
+                database.ref('history').set(newHistory);
+            };
 
-            useEffect(() => {
-                localStorage.setItem('manualAssignments', JSON.stringify(manualAssignments));
-            }, [manualAssignments]);
+            const updateManualAssignments = (newAssignments) => {
+                database.ref('manualAssignments').set(newAssignments);
+            };
 
-            useEffect(() => {
-                localStorage.setItem('trackedWeek', trackedWeek.toString());
-            }, [trackedWeek]);
+            const updateTrackedWeek = (newWeek) => {
+                database.ref('trackedWeek').set(newWeek);
+            };
 
             const currentYear = new Date().getFullYear();
             const isEvenWeek = trackedWeek % 2 === 0;
@@ -160,10 +217,11 @@
             };
 
             const toggleTask = (task) => {
-                setTasks(prev => ({
-                    ...prev,
-                    [task]: !prev[task]
-                }));
+                const newTasks = {
+                    ...tasks,
+                    [task]: !tasks[task]
+                };
+                updateTasks(newTasks);
             };
 
             const completeWeek = (forceComplete = false) => {
@@ -177,24 +235,26 @@
                     forced: forceComplete
                 };
                 
-                setHistory(prev => [weekData, ...prev]);
+                const newHistory = [weekData, ...history];
+                updateHistory(newHistory);
                 
-                setTasks({
+                // Reset for next week
+                updateTasks({
                     woonkamer: false,
                     keuken: false,
                     vuilnis: false
                 });
-                setManualAssignments({
+                updateManualAssignments({
                     woonkamer: null,
                     keuken: null,
                     vuilnis: null
                 });
                 
-                setTrackedWeek(prev => prev + 1);
+                updateTrackedWeek(trackedWeek + 1);
             };
 
             const resetAll = () => {
-                setTasks({
+                updateTasks({
                     woonkamer: false,
                     keuken: false,
                     vuilnis: false
@@ -202,13 +262,13 @@
             };
 
             const clearHistory = () => {
-                setHistory([]);
-                localStorage.removeItem('cleaningHistory');
+                updateHistory([]);
                 setShowClearConfirm(false);
             };
 
             const adjustWeek = (increment) => {
-                setTrackedWeek(prev => Math.max(1, prev + increment));
+                const newWeek = Math.max(1, trackedWeek + increment);
+                updateTrackedWeek(newWeek);
             };
 
             const allComplete = tasks.woonkamer && tasks.keuken && tasks.vuilnis;
@@ -219,6 +279,17 @@
                 keuken: ['Tom', 'Maxim'],
                 vuilnis: ['Sam']
             };
+
+            if (isLoading) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="text-4xl mb-4">🧹</div>
+                            <div className="text-gray-600">Laden...</div>
+                        </div>
+                    </div>
+                );
+            }
 
             const TrackerView = () => (
                 <div>
@@ -488,7 +559,7 @@
                         <button
                             onClick={() => {
                                 const currentCalendarWeek = getWeekNumber(new Date());
-                                setTrackedWeek(currentCalendarWeek);
+                                updateTrackedWeek(currentCalendarWeek);
                             }}
                             className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 p-3 rounded-lg text-sm font-medium transition-all"
                         >
@@ -508,10 +579,13 @@
                                         {people.map(person => (
                                             <button
                                                 key={person}
-                                                onClick={() => setManualAssignments(prev => ({
-                                                    ...prev,
-                                                    [task]: person
-                                                }))}
+                                                onClick={() => {
+                                                    const newAssignments = {
+                                                        ...manualAssignments,
+                                                        [task]: person
+                                                    };
+                                                    updateManualAssignments(newAssignments);
+                                                }}
                                                 className={`flex-1 p-3 rounded-lg border-2 transition-all ${
                                                     assignments[task] === person
                                                         ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
@@ -527,7 +601,7 @@
                         </div>
                         <button
                             onClick={() => {
-                                setManualAssignments({
+                                updateManualAssignments({
                                     woonkamer: null,
                                     keuken: null,
                                     vuilnis: null
