@@ -406,6 +406,8 @@
           getTimeUntilDeadline()
         );
 
+        const [showInstallGuide, setShowInstallGuide] = useState(false);
+
         // Update deadline timer
         useEffect(() => {
           const interval = setInterval(() => {
@@ -672,27 +674,120 @@
 
         // User Picker Modal
         if (showUserPicker) {
+          const isStandalone =
+            window.matchMedia("(display-mode: standalone)").matches ||
+            window.navigator.standalone;
+
           return (
             <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">
-                  Wie ben jij?
-                </h2>
-                <p className="text-gray-600 text-center mb-6">
-                  Selecteer je naam om te beginnen
-                </p>
-                <div className="space-y-3">
-                  {people.map((name) => (
-                    <button
-                      key={name}
-                      onClick={() => selectUser(name)}
-                      className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all font-medium text-gray-700 hover:text-blue-700"
-                    >
-                      {name}
-                    </button>
-                  ))}
+              <div className="max-w-sm w-full space-y-4">
+                <div className="bg-white rounded-2xl shadow-2xl p-8">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">
+                    Wie ben jij?
+                  </h2>
+                  <p className="text-gray-600 text-center mb-6">
+                    Selecteer je naam om te beginnen
+                  </p>
+                  <div className="space-y-3">
+                    {people.map((name) => (
+                      <button
+                        key={name}
+                        onClick={() => selectUser(name)}
+                        className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all font-medium text-gray-700 hover:text-blue-700"
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {!isStandalone && (
+                  <button
+                    onClick={() => setShowInstallGuide(true)}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                  >
+                    <span className="text-xl">📱</span>
+                    <span className="font-medium">
+                      Installeer app op beginscherm
+                    </span>
+                  </button>
+                )}
               </div>
+
+              {/* Install Guide Modal */}
+              {showInstallGuide && (
+                <>
+                  <div
+                    className="fixed inset-0 bg-black bg-opacity-50 z-40"
+                    onClick={() => setShowInstallGuide(false)}
+                  />
+
+                  <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full max-h-[90vh] overflow-y-auto">
+                      <div className="flex justify-between items-start mb-4">
+                        <h2 className="text-xl font-bold text-gray-800">
+                          Installeer op beginscherm
+                        </h2>
+                        <button
+                          onClick={() => setShowInstallGuide(false)}
+                          className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                          <p className="text-sm text-blue-800 font-medium mb-1">
+                            iOS Safari instructies:
+                          </p>
+                          <ol className="text-sm text-blue-700 space-y-2 list-decimal list-inside">
+                            <li>
+                              Tik op het <strong>"Deel"</strong> icoontje
+                              onderaan (vierkant met pijl omhoog)
+                            </li>
+                            <li>
+                              Scroll naar beneden en kies{" "}
+                              <strong>"Zet op beginscherm"</strong>
+                            </li>
+                            <li>
+                              Tik op <strong>"Voeg toe"</strong>
+                            </li>
+                          </ol>
+                        </div>
+
+                        <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                          <p className="text-sm text-green-800 font-medium mb-1">
+                            Android Chrome instructies:
+                          </p>
+                          <ol className="text-sm text-green-700 space-y-2 list-decimal list-inside">
+                            <li>
+                              Tik op het <strong>menu</strong> icoontje (3
+                              puntjes rechtsboven)
+                            </li>
+                            <li>
+                              Selecteer{" "}
+                              <strong>"Toevoegen aan startscherm"</strong>
+                            </li>
+                            <li>
+                              Tik op <strong>"Toevoegen"</strong>
+                            </li>
+                          </ol>
+                        </div>
+
+                        <div className="text-center pt-2">
+                          <button
+                            onClick={() => setShowInstallGuide(false)}
+                            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 p-3 rounded-xl font-medium transition-colors"
+                          >
+                            Begrepen
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           );
         }
