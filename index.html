@@ -321,7 +321,7 @@
         const sunday = getNextSunday();
         const diff = sunday - now;
 
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
         const hours = Math.floor(
           (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
         );
