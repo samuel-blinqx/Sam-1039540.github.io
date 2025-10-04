@@ -422,7 +422,7 @@
         useEffect(() => {
           checkAndArchiveOldWeeks();
           // No interval - just check on mount and when dependencies change
-        }, [trackedWeek, history, tasks, taskDefinitions, currentYear]);
+        }, [trackedWeek, history, tasks, taskDefinitions]);
 
         // Load data from Firebase and set up real-time listeners
         useEffect(() => {
