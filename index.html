@@ -1,905 +1,1739 @@
 <!DOCTYPE html>
 <html lang="nl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Zwaanshals Schoonmaak Tracker</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18/umd/react.production.min.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+    ></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-    
+
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-        }
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+          "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+          "Helvetica Neue", sans-serif;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        const { useState, useEffect } = React;
+      const { useState, useEffect } = React;
 
-        // Initialize Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyCy18JxgaB2P-mL-WeKu36XSzykhYi-ypY",
-            authDomain: "schoonmaak-tracker.firebaseapp.com",
-            databaseURL: "https://schoonmaak-tracker-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "schoonmaak-tracker",
-            storageBucket: "schoonmaak-tracker.firebasestorage.app",
-            messagingSenderId: "276714806125",
-            appId: "1:276714806125:web:4394e4d2412905c81e9864"
+      // Initialize Firebase
+      // Development config (for local testing)
+      const firebaseConfigDev = {
+        apiKey: "AIzaSyBWQt7JoTp9xpMbWlFqDZXGu99hbbo6KNQ",
+        authDomain: "schoonmaak-tracker-dev.firebaseapp.com",
+        databaseURL:
+          "https://schoonmaak-tracker-dev-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "schoonmaak-tracker-dev",
+        storageBucket: "schoonmaak-tracker-dev.firebasestorage.app",
+        messagingSenderId: "683196128061",
+        appId: "1:683196128061:web:713774020f21298a378354",
+      };
+
+      // Production config (for live site)
+      const firebaseConfigProd = {
+        apiKey: "AIzaSyCy18JxgaB2P-mL-WeKu36XSzykhYi-ypY",
+        authDomain: "schoonmaak-tracker.firebaseapp.com",
+        databaseURL:
+          "https://schoonmaak-tracker-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "schoonmaak-tracker",
+        storageBucket: "schoonmaak-tracker.firebasestorage.app",
+        messagingSenderId: "276714806125",
+        appId: "1:276714806125:web:4394e4d2412905c81e9864",
+      };
+
+      // Auto-detect environment: localhost = dev, otherwise = prod
+      const isDevelopment =
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname === "192.168.0.188"; // Your local IP
+
+      const firebaseConfig = isDevelopment
+        ? firebaseConfigDev
+        : firebaseConfigProd;
+
+      // Show which environment we're using (helpful for debugging)
+      console.log(
+        `🔥 Firebase Environment: ${
+          isDevelopment ? "DEVELOPMENT" : "PRODUCTION"
+        }`
+      );
+      console.log(`📦 Project: ${firebaseConfig.projectId}`);
+
+      firebase.initializeApp(firebaseConfig);
+      const database = firebase.database();
+
+      // Add new icon components
+      const Plus = ({ size = 24, className = "" }) => (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      );
+
+      const ChevronDown = ({ size = 24, className = "" }) => (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      );
+
+      // Simple icon components using SVG
+      const Check = ({ size = 24, className = "" }) => (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      );
+
+      const RotateCcw = ({ size = 24, className = "" }) => (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          <polyline points="1 4 1 10 7 10"></polyline>
+          <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+        </svg>
+      );
+
+      const History = ({ size = 24, className = "" }) => (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      );
+
+      const Settings = ({ size = 24, className = "" }) => (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      );
+
+      const ChevronLeft = ({ size = 24, className = "" }) => (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      );
+
+      const ChevronRight = ({ size = 24, className = "" }) => (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      );
+
+      const X = ({ size = 24, className = "" }) => (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      );
+
+      const Clock = ({ size = 24, className = "" }) => (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      );
+
+      const Activity = ({ size = 24, className = "" }) => (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      );
+
+      // Helper functions
+      const getWeekNumber = (date) => {
+        // ISO 8601 week number calculation
+        const target = new Date(date.valueOf());
+        const dayNr = (date.getDay() + 6) % 7; // Monday = 0, Sunday = 6
+        target.setDate(target.getDate() - dayNr + 3); // Thursday of current week
+        const jan4 = new Date(target.getFullYear(), 0, 4);
+        const dayDiff = (target - jan4) / 86400000; // Days between
+        return 1 + Math.ceil(dayDiff / 7);
+      };
+
+      const getWeekDateRange = (weekNum, year) => {
+        // ISO 8601 week date: Week 1 is the week with the first Thursday
+        const jan4 = new Date(year, 0, 4); // January 4th is always in week 1
+        const jan4Day = jan4.getDay() || 7; // Sunday = 7
+        const week1Monday = new Date(jan4);
+        week1Monday.setDate(jan4.getDate() - jan4Day + 1); // Get Monday of week 1
+
+        // Calculate Monday of target week
+        const monday = new Date(week1Monday);
+        monday.setDate(week1Monday.getDate() + (weekNum - 1) * 7);
+
+        // Calculate Sunday (6 days after Monday)
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+
+        const formatDate = (date) => {
+          return `${date.getDate()}/${date.getMonth() + 1}`;
         };
 
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+        return `${formatDate(monday)} - ${formatDate(sunday)}`;
+      };
 
-        // Simple icon components using SVG
-        const Check = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
+      const getNextSunday = () => {
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek;
+        const sunday = new Date(now);
+        sunday.setDate(now.getDate() + daysUntilSunday);
+        sunday.setHours(23, 59, 59, 999);
+        return sunday;
+      };
+
+      const getNextSundayFormatted = () => {
+        const sunday = getNextSunday();
+        return sunday.toLocaleDateString("nl-NL", {
+          day: "numeric",
+          month: "long",
+        });
+      };
+
+      const getTimeUntilDeadline = () => {
+        const now = new Date();
+        const sunday = getNextSunday();
+        const diff = sunday - now;
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor(
+          (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
         );
 
-        const RotateCcw = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                <polyline points="1 4 1 10 7 10"></polyline>
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-            </svg>
+        if (days > 0) {
+          return `${days} dag${days !== 1 ? "en" : ""}`;
+        } else if (hours > 0) {
+          return `${hours} uur`;
+        } else {
+          return "Bijna voorbij!";
+        }
+      };
+
+      const formatTimestamp = (timestamp) => {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = now - date;
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+
+        if (minutes < 1) return "Zojuist";
+        if (minutes < 60) return `${minutes} min geleden`;
+        if (hours < 24) return `${hours} uur geleden`;
+        if (days < 7) return `${days} dag${days !== 1 ? "en" : ""} geleden`;
+
+        return date.toLocaleDateString("nl-NL", {
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      };
+
+      function CleaningTracker() {
+        const [currentView, setCurrentView] = useState("tracker");
+        const [currentUser, setCurrentUser] = useState(() => {
+          return localStorage.getItem("currentUser") || "";
+        });
+        const [showUserPicker, setShowUserPicker] = useState(
+          !localStorage.getItem("currentUser")
         );
 
-        const History = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
+        const [tasks, setTasks] = useState({});
+        const [history, setHistory] = useState([]);
+        const [activityLog, setActivityLog] = useState([]);
+        const [people, setPeople] = useState([
+          "Sam",
+          "Roel",
+          "Stijn",
+          "Tom",
+          "Maxim",
+        ]);
+        const [rotationOffsets, setRotationOffsets] = useState({});
+        const [taskDefinitions, setTaskDefinitions] = useState([
+          {
+            id: "woonkamer",
+            name: "Woonkamer",
+            assignedPeople: ["Roel", "Stijn"],
+            expanded: false,
+          },
+          {
+            id: "keuken",
+            name: "Keuken",
+            assignedPeople: ["Tom", "Maxim"],
+            expanded: false,
+          },
+          {
+            id: "vuilnis",
+            name: "Doeken/Vuilnis",
+            assignedPeople: ["Sam"],
+            expanded: false,
+          },
+        ]);
+
+        const [showClearConfirm, setShowClearConfirm] = useState(false);
+        const [trackedWeek, setTrackedWeek] = useState(
+          getWeekNumber(new Date())
+        );
+        const [isLoading, setIsLoading] = useState(true);
+        const [timeUntilDeadline, setTimeUntilDeadline] = useState(
+          getTimeUntilDeadline()
         );
 
-        const Settings = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M12 1v6m0 6v6m5.66-13l-4.24 4.24M10.34 13.76 6.1 18M23 12h-6m-6 0H1m18.66 5-4.24-4.24M10.34 10.24 6.1 6"></path>
-            </svg>
-        );
+        // Update deadline timer
+        useEffect(() => {
+          const interval = setInterval(() => {
+            setTimeUntilDeadline(getTimeUntilDeadline());
+          }, 60000); // Update every minute
+          return () => clearInterval(interval);
+        }, []);
 
-        const ChevronLeft = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-        );
+        // Automatic week archiving check
+        useEffect(() => {
+          checkAndArchiveOldWeeks();
+          // No interval - just check on mount and when dependencies change
+        }, [trackedWeek, history, tasks, taskDefinitions, currentYear]);
 
-        const ChevronRight = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-        );
-
-        const X = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-        );
-
-        const Clock = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
-        );
-
-        const Activity = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-            </svg>
-        );
-
-        // Helper functions
-        const getWeekNumber = (date) => {
-            const firstJan = new Date(date.getFullYear(), 0, 1);
-            const days = Math.floor((date - firstJan) / (24 * 60 * 60 * 1000));
-            return Math.ceil((days + firstJan.getDay() + 1) / 7);
-        };
-
-        const getWeekDateRange = (weekNum, year) => {
-            // Get first day of the year
-            const firstJan = new Date(year, 0, 1);
-            
-            // Calculate days to first Monday of the year
-            const firstMonday = new Date(firstJan);
-            const dayOfWeek = firstJan.getDay();
-            const daysToMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 + 1;
-            firstMonday.setDate(firstJan.getDate() + daysToMonday);
-            
-            // Calculate Monday of target week
-            const monday = new Date(firstMonday);
-            monday.setDate(firstMonday.getDate() + (weekNum - 1) * 7);
-            
-            // Calculate Sunday (6 days after Monday)
-            const sunday = new Date(monday);
-            sunday.setDate(monday.getDate() + 6);
-            
-            const formatDate = (date) => {
-                return `${date.getDate()}/${date.getMonth() + 1}`;
-            };
-            
-            return `${formatDate(monday)} - ${formatDate(sunday)}`;
-        };
-
-        const getNextSunday = () => {
-            const now = new Date();
-            const dayOfWeek = now.getDay();
-            const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek;
-            const sunday = new Date(now);
-            sunday.setDate(now.getDate() + daysUntilSunday);
-            sunday.setHours(23, 59, 59, 999);
-            return sunday;
-        };
-
-        const getTimeUntilDeadline = () => {
-            const now = new Date();
-            const sunday = getNextSunday();
-            const diff = sunday - now;
-            
-            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            
-            if (days > 0) {
-                return `${days} dag${days !== 1 ? 'en' : ''}`;
-            } else if (hours > 0) {
-                return `${hours} uur`;
+        // Load data from Firebase and set up real-time listeners
+        useEffect(() => {
+          // Real-time listener for current week's tasks
+          const currentWeekTasksRef = database.ref(
+            `tasksByWeek/${trackedWeek}`
+          );
+          currentWeekTasksRef.on("value", (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              setTasks(data);
             } else {
-                return "Bijna voorbij!";
+              // Initialize empty tasks for this week
+              const emptyTasks = {};
+              taskDefinitions.forEach((taskDef) => {
+                emptyTasks[taskDef.id] = false;
+              });
+              setTasks(emptyTasks);
             }
+          });
+          setIsLoading(false);
+
+          // Listen to history
+          const historyRef = database.ref("history");
+          historyRef.on("value", (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              setHistory(data);
+            } else {
+              setHistory([]);
+            }
+          });
+
+          // Listen to activity log
+          const activityRef = database.ref("activity");
+          activityRef.on("value", (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              setActivityLog(data);
+            } else {
+              setActivityLog([]);
+            }
+          });
+
+          // Listen to people
+          const peopleRef = database.ref("people");
+          peopleRef.on("value", (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              setPeople(data);
+            }
+          });
+
+          // Listen to task definitions
+          const taskDefsRef = database.ref("taskDefinitions");
+          taskDefsRef.on("value", (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              // Normalize: ensure all tasks have assignedPeople array
+              const normalizedData = data.map((task) => ({
+                ...task,
+                assignedPeople: task.assignedPeople || [],
+                expanded: task.expanded || false,
+              }));
+              setTaskDefinitions(normalizedData);
+            }
+          });
+
+          // Listen to rotation offsets
+          const offsetsRef = database.ref("rotationOffsets");
+          offsetsRef.on("value", (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              setRotationOffsets(data);
+            }
+          });
+
+          // Listen to tracked week
+          const weekRef = database.ref("trackedWeek");
+          weekRef.on("value", (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              setTrackedWeek(data);
+            }
+          });
+
+          // Cleanup listeners on unmount and when week changes
+          return () => {
+            currentWeekTasksRef.off();
+            historyRef.off();
+            activityRef.off();
+            peopleRef.off();
+            taskDefsRef.off();
+            offsetsRef.off();
+            weekRef.off();
+          };
+        }, [trackedWeek]);
+
+        const logActivity = (action, task, status) => {
+          const activity = {
+            user: currentUser,
+            action: action,
+            task: task,
+            status: status,
+            timestamp: Date.now(),
+          };
+          const newActivity = [activity, ...activityLog].slice(0, 100); // Keep last 100 activities
+          database.ref("activity").set(newActivity);
         };
 
-        const formatTimestamp = (timestamp) => {
-            const date = new Date(timestamp);
-            const now = new Date();
-            const diff = now - date;
-            const minutes = Math.floor(diff / 60000);
-            const hours = Math.floor(diff / 3600000);
-            const days = Math.floor(diff / 86400000);
-
-            if (minutes < 1) return 'Zojuist';
-            if (minutes < 60) return `${minutes} min geleden`;
-            if (hours < 24) return `${hours} uur geleden`;
-            if (days < 7) return `${days} dag${days !== 1 ? 'en' : ''} geleden`;
-            
-            return date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        const updateTasks = (newTasks) => {
+          database.ref(`tasksByWeek/${trackedWeek}`).set(newTasks);
         };
 
-        function CleaningTracker() {
-            const [currentView, setCurrentView] = useState('tracker');
-            const [currentUser, setCurrentUser] = useState(() => {
-                return localStorage.getItem('currentUser') || '';
-            });
-            const [showUserPicker, setShowUserPicker] = useState(!localStorage.getItem('currentUser'));
-            const [tasks, setTasks] = useState({
-                woonkamer: false,
-                keuken: false,
-                vuilnis: false
-            });
-            
-            const [history, setHistory] = useState([]);
-            const [activityLog, setActivityLog] = useState([]);
-            
-            const [manualAssignments, setManualAssignments] = useState({
-                woonkamer: null,
-                keuken: null,
-                vuilnis: null
-            });
+        const updateHistory = (newHistory) => {
+          database.ref("history").set(newHistory);
+        };
 
-            const [showClearConfirm, setShowClearConfirm] = useState(false);
-            const [trackedWeek, setTrackedWeek] = useState(getWeekNumber(new Date()));
-            const [isLoading, setIsLoading] = useState(true);
-            const [timeUntilDeadline, setTimeUntilDeadline] = useState(getTimeUntilDeadline());
+        const updatePeople = (newPeople) => {
+          database.ref("people").set(newPeople);
+        };
 
-            const roommates = ['Sam', 'Roel', 'Stijn', 'Tom', 'Maxim'];
+        const updateTaskDefinitions = (newTaskDefs) => {
+          database.ref("taskDefinitions").set(newTaskDefs);
+        };
 
-            // Update deadline timer
-            useEffect(() => {
-                const interval = setInterval(() => {
-                    setTimeUntilDeadline(getTimeUntilDeadline());
-                }, 60000); // Update every minute
-                return () => clearInterval(interval);
-            }, []);
+        const updateRotationOffsets = (newOffsets) => {
+          database.ref("rotationOffsets").set(newOffsets);
+        };
 
-            // Load data from Firebase and set up real-time listeners
-            useEffect(() => {
-                // Listen to tasks
-                const tasksRef = database.ref('tasks');
-                tasksRef.on('value', (snapshot) => {
-                    const data = snapshot.val();
-                    if (data) {
-                        setTasks(data);
-                    }
-                    setIsLoading(false);
-                });
+        const updateTrackedWeek = (newWeek) => {
+          database.ref("trackedWeek").set(newWeek);
+        };
 
-                // Listen to history
-                const historyRef = database.ref('history');
-                historyRef.on('value', (snapshot) => {
-                    const data = snapshot.val();
-                    if (data) {
-                        setHistory(data);
-                    } else {
-                        setHistory([]);
-                    }
-                });
+        const selectUser = (user) => {
+          setCurrentUser(user);
+          localStorage.setItem("currentUser", user);
+          setShowUserPicker(false);
+        };
 
-                // Listen to activity log
-                const activityRef = database.ref('activity');
-                activityRef.on('value', (snapshot) => {
-                    const data = snapshot.val();
-                    if (data) {
-                        setActivityLog(data);
-                    } else {
-                        setActivityLog([]);
-                    }
-                });
+        const currentYear = new Date().getFullYear();
 
-                // Listen to manual assignments
-                const assignmentsRef = database.ref('manualAssignments');
-                assignmentsRef.on('value', (snapshot) => {
-                    const data = snapshot.val();
-                    if (data) {
-                        setManualAssignments(data);
-                    }
-                });
+        // Calculate current assignments based on rotation
+        const getAssignments = () => {
+          const result = {};
+          taskDefinitions.forEach((taskDef) => {
+            const assignedPeople = taskDef.assignedPeople || [];
 
-                // Listen to tracked week
-                const weekRef = database.ref('trackedWeek');
-                weekRef.on('value', (snapshot) => {
-                    const data = snapshot.val();
-                    if (data) {
-                        setTrackedWeek(data);
-                    }
-                });
-
-                // Cleanup listeners on unmount
-                return () => {
-                    tasksRef.off();
-                    historyRef.off();
-                    activityRef.off();
-                    assignmentsRef.off();
-                    weekRef.off();
-                };
-            }, []);
-
-            const logActivity = (action, task, status) => {
-                const activity = {
-                    user: currentUser,
-                    action: action,
-                    task: task,
-                    status: status,
-                    timestamp: Date.now()
-                };
-                const newActivity = [activity, ...activityLog].slice(0, 100); // Keep last 100 activities
-                database.ref('activity').set(newActivity);
-            };
-
-            const updateTasks = (newTasks) => {
-                database.ref('tasks').set(newTasks);
-            };
-
-            const updateHistory = (newHistory) => {
-                database.ref('history').set(newHistory);
-            };
-
-            const updateManualAssignments = (newAssignments) => {
-                database.ref('manualAssignments').set(newAssignments);
-            };
-
-            const updateTrackedWeek = (newWeek) => {
-                database.ref('trackedWeek').set(newWeek);
-            };
-
-            const selectUser = (user) => {
-                setCurrentUser(user);
-                localStorage.setItem('currentUser', user);
-                setShowUserPicker(false);
-            };
-
-            const currentYear = new Date().getFullYear();
-            const isEvenWeek = trackedWeek % 2 === 0;
-
-            const defaultAssignments = {
-                woonkamer: isEvenWeek ? 'Roel' : 'Stijn',
-                keuken: isEvenWeek ? 'Tom' : 'Maxim',
-                vuilnis: 'Sam'
-            };
-
-            const assignments = {
-                woonkamer: manualAssignments.woonkamer || defaultAssignments.woonkamer,
-                keuken: manualAssignments.keuken || defaultAssignments.keuken,
-                vuilnis: manualAssignments.vuilnis || defaultAssignments.vuilnis
-            };
-
-            const nextWeek = {
-                woonkamer: isEvenWeek ? 'Stijn' : 'Roel',
-                keuken: isEvenWeek ? 'Maxim' : 'Tom',
-                vuilnis: 'Sam'
-            };
-
-            const toggleTask = (task) => {
-                const newStatus = !tasks[task];
-                const newTasks = {
-                    ...tasks,
-                    [task]: newStatus
-                };
-                updateTasks(newTasks);
-                logActivity(
-                    newStatus ? 'afgevinkt' : 'uitgevinkt',
-                    task === 'woonkamer' ? 'Woonkamer' : task === 'keuken' ? 'Keuken' : 'Doeken/Vuilnis',
-                    newStatus
-                );
-            };
-
-            const completeWeek = (forceComplete = false) => {
-                const weekData = {
-                    weekNumber: trackedWeek,
-                    year: currentYear,
-                    dateRange: getWeekDateRange(trackedWeek, currentYear),
-                    completedDate: new Date().toISOString(),
-                    assignments: { ...assignments },
-                    tasks: { ...tasks },
-                    forced: forceComplete
-                };
-                
-                const newHistory = [weekData, ...history];
-                updateHistory(newHistory);
-                
-                updateTasks({
-                    woonkamer: false,
-                    keuken: false,
-                    vuilnis: false
-                });
-                updateManualAssignments({
-                    woonkamer: null,
-                    keuken: null,
-                    vuilnis: null
-                });
-                
-                updateTrackedWeek(trackedWeek + 1);
-                logActivity('voltooide week', `Week ${trackedWeek}`, true);
-            };
-
-            const clearHistory = () => {
-                updateHistory([]);
-                setShowClearConfirm(false);
-            };
-
-            const adjustWeek = (increment) => {
-                const newWeek = Math.max(1, trackedWeek + increment);
-                updateTrackedWeek(newWeek);
-            };
-
-            const allComplete = tasks.woonkamer && tasks.keuken && tasks.vuilnis;
-            const completedCount = Object.values(tasks).filter(Boolean).length;
-
-            const roommatesList = {
-                woonkamer: ['Roel', 'Stijn'],
-                keuken: ['Tom', 'Maxim'],
-                vuilnis: ['Sam']
-            };
-
-            // User Picker Modal
-            if (showUserPicker) {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full">
-                            <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">Wie ben jij?</h2>
-                            <p className="text-gray-600 text-center mb-6">Selecteer je naam om te beginnen</p>
-                            <div className="space-y-3">
-                                {roommates.map(name => (
-                                    <button
-                                        key={name}
-                                        onClick={() => selectUser(name)}
-                                        className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all font-medium text-gray-700 hover:text-blue-700"
-                                    >
-                                        {name}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                );
+            if (assignedPeople.length > 1) {
+              const offset = rotationOffsets[taskDef.id] || 0;
+              const index = (trackedWeek - 1 + offset) % assignedPeople.length;
+              result[taskDef.id] = assignedPeople[index];
+            } else if (assignedPeople.length > 0) {
+              result[taskDef.id] = assignedPeople[0];
+            } else {
+              result[taskDef.id] = "Niemand";
             }
+          });
+          return result;
+        };
 
-            if (isLoading) {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="text-4xl mb-4">🧹</div>
-                            <div className="text-gray-600">Laden...</div>
-                        </div>
-                    </div>
-                );
+        const assignments = getAssignments();
+
+        const toggleTask = (taskId) => {
+          const currentCalendarWeek = getWeekNumber(new Date());
+          const isPastWeek = trackedWeek < currentCalendarWeek;
+          const isFutureWeek = trackedWeek > currentCalendarWeek;
+
+          // Don't allow any changes to future weeks
+          if (isFutureWeek) {
+            return;
+          }
+
+          // For past weeks: only allow checking tasks (not unchecking)
+          if (isPastWeek && tasks[taskId]) {
+            return; // Already completed, don't allow unchecking
+          }
+
+          const newStatus = !tasks[taskId];
+          const newTasks = {
+            ...tasks,
+            [taskId]: newStatus,
+          };
+          updateTasks(newTasks);
+          const taskName =
+            taskDefinitions.find((t) => t.id === taskId)?.name || taskId;
+          logActivity(
+            newStatus ? "afgevinkt" : "uitgevinkt",
+            taskName,
+            newStatus
+          );
+        };
+
+        const checkAndArchiveOldWeeks = () => {
+          const currentCalendarWeek = getWeekNumber(new Date());
+
+          if (trackedWeek < currentCalendarWeek) {
+            const alreadyCompleted = history.some(
+              (week) =>
+                week.weekNumber === trackedWeek && week.year === currentYear
+            );
+
+            if (!alreadyCompleted) {
+              const weekData = {
+                weekNumber: trackedWeek,
+                year: currentYear,
+                dateRange: getWeekDateRange(trackedWeek, currentYear),
+                completedDate: new Date().toISOString(),
+                assignments: { ...assignments },
+                tasks: { ...tasks },
+                autoArchived: true,
+              };
+
+              // Add and sort by week number (newest first)
+              const newHistory = [...history, weekData].sort((a, b) => {
+                if (a.year !== b.year) return b.year - a.year;
+                return b.weekNumber - a.weekNumber;
+              });
+
+              updateHistory(newHistory);
+              logActivity(
+                "automatisch gearchiveerd",
+                `Week ${trackedWeek}`,
+                true
+              );
             }
+          }
+        };
 
-            const TrackerView = () => (
-                <div>
-                    {/* User indicator */}
-                    <div className="bg-white rounded-xl shadow-md p-3 mb-4 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-semibold text-sm">
-                                {currentUser.charAt(0)}
-                            </div>
-                            <span className="text-sm text-gray-600">Ingelogd als <span className="font-semibold text-gray-800">{currentUser}</span></span>
-                        </div>
-                        <button
-                            onClick={() => {
-                                localStorage.removeItem('currentUser');
-                                setShowUserPicker(true);
-                            }}
-                            className="text-xs text-blue-600 hover:text-blue-700"
-                        >
-                            Wissel
-                        </button>
-                    </div>
+        const adjustWeek = (increment) => {
+          const currentCalendarWeek = getWeekNumber(new Date());
+          const newWeek = Math.max(
+            1,
+            Math.min(currentCalendarWeek, trackedWeek + increment)
+          );
+          updateTrackedWeek(newWeek);
+        };
 
-                    <div className="bg-white rounded-2xl shadow-lg p-6 mb-4">
-                        <div className="flex justify-between items-start mb-2">
-                            <div>
-                                <h1 className="text-2xl font-bold text-gray-800">🧹 Schoonmaak</h1>
-                                <p className="text-gray-600">Week {trackedWeek} • {getWeekDateRange(trackedWeek, currentYear)}</p>
-                            </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setCurrentView('activity')}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                    title="Activiteit"
-                                >
-                                    <Activity size={20} className="text-gray-600" />
-                                </button>
-                                <button
-                                    onClick={() => setCurrentView('history')}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                    title="Geschiedenis"
-                                >
-                                    <History size={20} className="text-gray-600" />
-                                </button>
-                                <button
-                                    onClick={() => setCurrentView('edit')}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                    title="Aanpassen"
-                                >
-                                    <Settings size={20} className="text-gray-600" />
-                                </button>
-                            </div>
-                        </div>
-                        <div className="mt-3 flex items-center gap-2">
-                            <div className="flex-1 bg-gray-200 rounded-full h-2">
-                                <div 
-                                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                                    style={{ width: `${(completedCount / 3) * 100}%` }}
-                                />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700">
-                                {completedCount}/3
-                            </span>
-                        </div>
-                    </div>
+        const clearHistory = () => {
+          updateHistory([]);
+          setShowClearConfirm(false);
+          logActivity("wiste geschiedenis", "Alle weken", true);
+        };
 
-                    {/* Deadline Banner */}
-                    <div className="bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-500 rounded-lg p-4 mb-4 flex items-center gap-3">
-                        <Clock size={24} className="text-orange-600" />
-                        <div className="flex-1">
-                            <div className="font-semibold text-gray-800">Deadline: Zondag</div>
-                            <div className="text-sm text-gray-600">{timeUntilDeadline} resterend</div>
-                        </div>
-                    </div>
+        const allComplete = taskDefinitions.every(
+          (taskDef) => tasks[taskDef.id]
+        );
+        const completedCount = taskDefinitions.filter(
+          (taskDef) => tasks[taskDef.id]
+        ).length;
 
-                    <div className="space-y-3 mb-4">
-                        {Object.entries(assignments).map(([task, person]) => (
-                            <button
-                                key={task}
-                                onClick={() => toggleTask(task)}
-                                className={`w-full p-5 rounded-xl shadow-md transition-all transform active:scale-98 ${
-                                    tasks[task] 
-                                        ? 'bg-green-500 text-white' 
-                                        : 'bg-white text-gray-800 hover:shadow-lg'
-                                }`}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="text-left">
-                                        <div className="font-semibold text-lg capitalize">
-                                            {task === 'woonkamer' ? 'Woonkamer' : task === 'keuken' ? 'Keuken' : 'Doeken/Vuilnis'}
-                                        </div>
-                                        <div className={`text-sm ${tasks[task] ? 'text-green-100' : 'text-gray-600'}`}>
-                                            {person}
-                                        </div>
-                                    </div>
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                        tasks[task] ? 'bg-white' : 'bg-gray-200'
-                                    }`}>
-                                        {tasks[task] && <Check size={20} className="text-green-500" />}
-                                    </div>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="space-y-2">
-                        {allComplete ? (
-                            <button
-                                onClick={() => completeWeek(false)}
-                                className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl shadow-lg font-semibold hover:from-green-600 hover:to-green-700 transition-all"
-                            >
-                                ✨ Week Voltooien & Opslaan
-                            </button>
-                        ) : (
-                            <button
-                                onClick={() => completeWeek(true)}
-                                className="w-full bg-orange-500 hover:bg-orange-600 text-white p-4 rounded-xl shadow-lg font-semibold transition-all flex items-center justify-center gap-2"
-                            >
-                                <ChevronRight size={20} />
-                                Naar Volgende Week (Onvolledig)
-                            </button>
-                        )}
-                    </div>
-
-                    <div className="bg-white rounded-xl shadow-md p-4 mt-4">
-                        <h3 className="font-semibold text-gray-700 mb-2">📅 Volgende week:</h3>
-                        <div className="space-y-1 text-sm text-gray-600">
-                            <div className="flex justify-between">
-                                <span>Woonkamer:</span>
-                                <span className="font-medium text-gray-800">{nextWeek.woonkamer}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Keuken:</span>
-                                <span className="font-medium text-gray-800">{nextWeek.keuken}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Doeken/Vuilnis:</span>
-                                <span className="font-medium text-gray-800">{nextWeek.vuilnis}</span>
-                            </div>
-                        </div>
-                    </div>
+        // User Picker Modal
+        if (showUserPicker) {
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">
+                  Wie ben jij?
+                </h2>
+                <p className="text-gray-600 text-center mb-6">
+                  Selecteer je naam om te beginnen
+                </p>
+                <div className="space-y-3">
+                  {people.map((name) => (
+                    <button
+                      key={name}
+                      onClick={() => selectUser(name)}
+                      className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all font-medium text-gray-700 hover:text-blue-700"
+                    >
+                      {name}
+                    </button>
+                  ))}
                 </div>
-            );
-
-            const ActivityView = () => (
-                <div>
-                    <div className="bg-white rounded-2xl shadow-lg p-6 mb-4">
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setCurrentView('tracker')}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
-                                <ChevronLeft size={20} />
-                            </button>
-                            <div>
-                                <h1 className="text-2xl font-bold text-gray-800">📊 Activiteit</h1>
-                                <p className="text-gray-600">Recente activiteiten</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {activityLog.length === 0 ? (
-                        <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">
-                            <Activity size={48} className="mx-auto mb-3 opacity-30" />
-                            <p>Nog geen activiteiten</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {activityLog.map((activity, index) => (
-                                <div key={index} className="bg-white rounded-xl shadow-md p-4">
-                                    <div className="flex items-start gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-sm flex-shrink-0">
-                                            {activity.user.charAt(0)}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-sm">
-                                                <span className="font-semibold text-gray-800">{activity.user}</span>
-                                                <span className="text-gray-600"> {activity.action} </span>
-                                                <span className="font-medium text-gray-800">{activity.task}</span>
-                                            </div>
-                                            <div className="text-xs text-gray-500 mt-1">
-                                                {formatTimestamp(activity.timestamp)}
-                                            </div>
-                                        </div>
-                                        {activity.status !== undefined && (
-                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                                activity.status ? 'bg-green-100' : 'bg-gray-100'
-                                            }`}>
-                                                {activity.status ? (
-                                                    <Check size={14} className="text-green-600" />
-                                                ) : (
-                                                    <X size={14} className="text-gray-400" />
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            );
-
-            const HistoryView = () => (
-                <div>
-                    <div className="bg-white rounded-2xl shadow-lg p-6 mb-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => setCurrentView('tracker')}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                >
-                                    <ChevronLeft size={20} />
-                                </button>
-                                <div>
-                                    <h1 className="text-2xl font-bold text-gray-800">📜 Geschiedenis</h1>
-                                    <p className="text-gray-600">{history.length} voltooide weken</p>
-                                </div>
-                            </div>
-                            {history.length > 0 && (
-                                <button
-                                    onClick={() => setShowClearConfirm(true)}
-                                    className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600"
-                                    title="Wis geschiedenis"
-                                >
-                                    <X size={20} />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    {showClearConfirm && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-                                <h3 className="text-xl font-bold text-gray-800 mb-2">Geschiedenis Wissen?</h3>
-                                <p className="text-gray-600 mb-6">
-                                    Weet je zeker dat je alle {history.length} week{history.length !== 1 ? 'en' : ''} wilt wissen? Dit kan niet ongedaan worden.
-                                </p>
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={() => setShowClearConfirm(false)}
-                                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 p-3 rounded-xl font-medium transition-all"
-                                    >
-                                        Annuleren
-                                    </button>
-                                    <button
-                                        onClick={clearHistory}
-                                        className="flex-1 bg-red-500 hover:bg-red-600 text-white p-3 rounded-xl font-medium transition-all"
-                                    >
-                                        Wissen
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {history.length === 0 ? (
-                        <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">
-                            <History size={48} className="mx-auto mb-3 opacity-30" />
-                            <p>Nog geen voltooide weken</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {history.map((week, index) => {
-                                const allTasksComplete = Object.values(week.tasks).every(Boolean);
-                                const completedTaskCount = Object.values(week.tasks).filter(Boolean).length;
-                                
-                                return (
-                                    <div key={index} className="bg-white rounded-xl shadow-md p-5">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div>
-                                                <div className="font-semibold text-gray-800">Week {week.weekNumber}</div>
-                                                <div className="text-sm text-gray-600">{week.dateRange}</div>
-                                            </div>
-                                            <div className="flex gap-1">
-                                                {allTasksComplete ? (
-                                                    <span className="text-green-500 text-sm font-medium flex items-center gap-1">
-                                                        <Check size={16} /> Compleet
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-orange-500 text-sm font-medium flex items-center gap-1">
-                                                        {completedTaskCount}/3 Taken
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            {Object.entries(week.assignments).map(([task, person]) => (
-                                                <div key={task} className="flex items-center justify-between text-sm">
-                                                    <span className="text-gray-600 capitalize">
-                                                        {task === 'woonkamer' ? 'Woonkamer' : task === 'keuken' ? 'Keuken' : 'Doeken/Vuilnis'}:
-                                                    </span>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-medium text-gray-800">{person}</span>
-                                                        {week.tasks[task] ? (
-                                                            <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
-                                                                <Check size={16} className="text-green-600" />
-                                                            </div>
-                                                        ) : (
-                                                            <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
-                                                                <X size={16} className="text-red-600" />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            );
-
-            const EditView = () => (
-                <div>
-                    <div className="bg-white rounded-2xl shadow-lg p-6 mb-4">
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setCurrentView('tracker')}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
-                                <ChevronLeft size={20} />
-                            </button>
-                            <div>
-                                <h1 className="text-2xl font-bold text-gray-800">⚙️ Instellingen</h1>
-                                <p className="text-gray-600">Aanpassen en beheren</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-xl shadow-md p-5 mb-4">
-                        <h3 className="font-semibold text-gray-700 mb-3">📅 Week Aanpassen</h3>
-                        <div className="flex items-center justify-between mb-3">
-                            <div>
-                                <div className="text-2xl font-bold text-gray-800">Week {trackedWeek}</div>
-                                <div className="text-sm text-gray-600">{getWeekDateRange(trackedWeek, currentYear)}</div>
-                            </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => adjustWeek(-1)}
-                                    className="w-10 h-10 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold text-gray-700 transition-all"
-                                >
-                                    -
-                                </button>
-                                <button
-                                    onClick={() => adjustWeek(1)}
-                                    className="w-10 h-10 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold text-gray-700 transition-all"
-                                >
-                                    +
-                                </button>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => {
-                                const currentCalendarWeek = getWeekNumber(new Date());
-                                updateTrackedWeek(currentCalendarWeek);
-                            }}
-                            className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 p-3 rounded-lg text-sm font-medium transition-all"
-                        >
-                            Reset naar Huidige Kalenderweek
-                        </button>
-                    </div>
-
-                    <div className="bg-white rounded-xl shadow-md p-5 mb-4">
-                        <h3 className="font-semibold text-gray-700 mb-3">👥 Wie doet wat deze week?</h3>
-                        <div className="space-y-4">
-                            {Object.entries(roommatesList).map(([task, people]) => (
-                                <div key={task}>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
-                                        {task === 'woonkamer' ? 'Woonkamer' : task === 'keuken' ? 'Keuken' : 'Doeken/Vuilnis'}
-                                    </label>
-                                    <div className="flex gap-2">
-                                        {people.map(person => (
-                                            <button
-                                                key={person}
-                                                onClick={() => {
-                                                    const newAssignments = {
-                                                        ...manualAssignments,
-                                                        [task]: person
-                                                    };
-                                                    updateManualAssignments(newAssignments);
-                                                }}
-                                                className={`flex-1 p-3 rounded-lg border-2 transition-all ${
-                                                    assignments[task] === person
-                                                        ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                }`}
-                                            >
-                                                {person}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <button
-                            onClick={() => {
-                                updateManualAssignments({
-                                    woonkamer: null,
-                                    keuken: null,
-                                    vuilnis: null
-                                });
-                            }}
-                            className="w-full mt-4 bg-gray-100 hover:bg-gray-200 text-gray-700 p-3 rounded-lg font-medium transition-all"
-                        >
-                            Reset naar Automatische Rotatie
-                        </button>
-                    </div>
-
-                    <div className="bg-white rounded-xl shadow-md p-5 mb-4">
-                        <h3 className="font-semibold text-gray-700 mb-3">🗑️ Geschiedenis Beheren</h3>
-                        <p className="text-sm text-gray-600 mb-3">
-                            Je hebt {history.length} week{history.length !== 1 ? 'en' : ''} in de geschiedenis
-                        </p>
-                        <button
-                            onClick={() => setShowClearConfirm(true)}
-                            disabled={history.length === 0}
-                            className={`w-full p-3 rounded-lg font-medium transition-all ${
-                                history.length === 0
-                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                    : 'bg-red-50 hover:bg-red-100 text-red-700'
-                            }`}
-                        >
-                            Wis Alle Geschiedenis
-                        </button>
-                    </div>
-
-                    {showClearConfirm && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-                                <h3 className="text-xl font-bold text-gray-800 mb-2">Geschiedenis Wissen?</h3>
-                                <p className="text-gray-600 mb-6">
-                                    Weet je zeker dat je alle {history.length} week{history.length !== 1 ? 'en' : ''} wilt wissen? Dit kan niet ongedaan worden.
-                                </p>
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={() => setShowClearConfirm(false)}
-                                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 p-3 rounded-xl font-medium transition-all"
-                                    >
-                                        Annuleren
-                                    </button>
-                                    <button
-                                        onClick={clearHistory}
-                                        className="flex-1 bg-red-500 hover:bg-red-600 text-white p-3 rounded-xl font-medium transition-all"
-                                    >
-                                        Wissen
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                        <p className="text-sm text-blue-800">
-                            💡 <strong>Standaard rotatie:</strong> Roel ↔ Stijn voor Woonkamer en Tom ↔ Maxim voor Keuken per week
-                        </p>
-                    </div>
-                </div>
-            );
-
-            return (
-                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 pb-8">
-                    <div className="max-w-md mx-auto">
-                        {currentView === 'tracker' && <TrackerView />}
-                        {currentView === 'activity' && <ActivityView />}
-                        {currentView === 'history' && <HistoryView />}
-                        {currentView === 'edit' && <EditView />}
-                    </div>
-                </div>
-            );
+              </div>
+            </div>
+          );
         }
 
-        // Render the app
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<CleaningTracker />);
+        if (isLoading) {
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-4xl mb-4">🧹</div>
+                <div className="text-gray-600">Laden...</div>
+              </div>
+            </div>
+          );
+        }
+
+        const TrackerView = () => (
+          <div>
+            {/* User indicator */}
+            <div className="bg-white rounded-xl shadow-md p-3 mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-semibold text-sm">
+                  {currentUser.charAt(0)}
+                </div>
+                <span className="text-sm text-gray-600">
+                  Ingelogd als{" "}
+                  <span className="font-semibold text-gray-800">
+                    {currentUser}
+                  </span>
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  localStorage.removeItem("currentUser");
+                  setShowUserPicker(true);
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700"
+              >
+                Wissel
+              </button>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-lg p-6 mb-4">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-800">
+                    🧹 Schoonmaak
+                  </h1>
+                  <p className="text-gray-600">
+                    Week {trackedWeek} •{" "}
+                    {getWeekDateRange(trackedWeek, currentYear)}
+                  </p>
+                  {(() => {
+                    const currentCalendarWeek = getWeekNumber(new Date());
+                    if (trackedWeek < currentCalendarWeek) {
+                      return (
+                        <span className="inline-block mt-1 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium">
+                          📅 Verleden week
+                        </span>
+                      );
+                    } else if (trackedWeek > currentCalendarWeek) {
+                      return (
+                        <span className="inline-block mt-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                          ⏳ Toekomstige week
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentView("activity")}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Activiteit"
+                  >
+                    <Activity size={20} className="text-gray-600" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentView("history")}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Geschiedenis"
+                  >
+                    <History size={20} className="text-gray-600" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentView("edit")}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Aanpassen"
+                  >
+                    <Settings size={20} className="text-gray-600" />
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${
+                        taskDefinitions.length > 0
+                          ? (completedCount / taskDefinitions.length) * 100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+                <span className="text-sm font-medium text-gray-700">
+                  {completedCount}/{taskDefinitions.length}
+                </span>
+              </div>
+            </div>
+
+            {/* Deadline Banner */}
+            <div className="bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-500 rounded-lg p-4 mb-4 flex items-center gap-3">
+              <Clock size={24} className="text-orange-600" />
+              <div className="flex-1">
+                <div className="font-semibold text-gray-800">
+                  Deadline: Zondag {getNextSundayFormatted()}
+                </div>
+                <div className="text-sm text-gray-600">
+                  {timeUntilDeadline} resterend
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 mb-4">
+              {taskDefinitions.map((taskDef) => {
+                const currentCalendarWeek = getWeekNumber(new Date());
+                const isPastWeek = trackedWeek < currentCalendarWeek;
+                const isFutureWeek = trackedWeek > currentCalendarWeek;
+                const isCompleted = tasks[taskDef.id];
+
+                // Determine button style based on week status
+                let buttonClass = "";
+                let isDisabled = false;
+
+                if (isFutureWeek) {
+                  // Future week - grayed out, disabled
+                  buttonClass = "bg-gray-200 text-gray-400 cursor-not-allowed";
+                  isDisabled = true;
+                } else if (isPastWeek) {
+                  if (isCompleted) {
+                    // Past week, completed - yellow (late completion)
+                    buttonClass = "bg-yellow-500 text-white";
+                    isDisabled = true; // Can't uncheck
+                  } else {
+                    // Past week, not completed - can still check
+                    buttonClass =
+                      "bg-white text-gray-800 hover:shadow-lg border-2 border-orange-300";
+                  }
+                } else {
+                  // Current week - normal behavior
+                  buttonClass = isCompleted
+                    ? "bg-green-500 text-white"
+                    : "bg-white text-gray-800 hover:shadow-lg";
+                }
+
+                return (
+                  <button
+                    key={taskDef.id}
+                    onClick={() => toggleTask(taskDef.id)}
+                    disabled={isDisabled}
+                    className={`w-full p-5 rounded-xl shadow-md transition-all transform active:scale-98 ${buttonClass}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="text-left">
+                        <div className="font-semibold text-lg capitalize">
+                          {taskDef.name}
+                        </div>
+                        <div
+                          className={`text-sm ${
+                            isFutureWeek
+                              ? "text-gray-400"
+                              : isPastWeek && isCompleted
+                              ? "text-yellow-100"
+                              : isCompleted
+                              ? "text-green-100"
+                              : "text-gray-600"
+                          }`}
+                        >
+                          {assignments[taskDef.id]}
+                          {isPastWeek && isCompleted && " • Te laat voltooid"}
+                        </div>
+                      </div>
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          isCompleted
+                            ? "bg-white"
+                            : isFutureWeek
+                            ? "bg-gray-300"
+                            : "bg-gray-200"
+                        }`}
+                      >
+                        {isCompleted && (
+                          <Check
+                            size={20}
+                            className={
+                              isPastWeek ? "text-yellow-500" : "text-green-500"
+                            }
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {taskDefinitions.length === 0 && (
+              <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">
+                <p className="mb-4">Geen taken geconfigureerd</p>
+                <button
+                  onClick={() => setCurrentView("edit")}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Taken Toevoegen
+                </button>
+              </div>
+            )}
+
+            {taskDefinitions.length > 0 && (
+              <div className="space-y-2">
+                {(() => {
+                  const currentCalendarWeek = getWeekNumber(new Date());
+                  const isPastWeek = trackedWeek < currentCalendarWeek;
+                  const isFutureWeek = trackedWeek > currentCalendarWeek;
+
+                  if (isPastWeek) {
+                    return (
+                      <div className="bg-gray-100 border-2 border-gray-300 text-gray-600 p-4 rounded-xl text-center">
+                        <div className="font-semibold mb-1">
+                          📅 Week Automatisch Gearchiveerd
+                        </div>
+                        <div className="text-sm">
+                          Deze week is afgelopen en opgeslagen in geschiedenis
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (isFutureWeek) {
+                    return (
+                      <div className="bg-blue-50 border-2 border-blue-200 text-blue-700 p-4 rounded-xl text-center">
+                        <div className="font-semibold mb-1">
+                          ⏳ Toekomstige Week
+                        </div>
+                        <div className="text-sm">
+                          Deze week is nog niet begonnen
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Current week - show status only
+                  return (
+                    <div
+                      className={`p-4 rounded-xl text-center border-2 ${
+                        allComplete
+                          ? "bg-green-50 border-green-300 text-green-800"
+                          : "bg-blue-50 border-blue-300 text-blue-800"
+                      }`}
+                    >
+                      <div className="font-semibold mb-1">
+                        {allComplete
+                          ? "✅ Alle Taken Voltooid!"
+                          : "📝 Week Loopt"}
+                      </div>
+                      <div className="text-sm">
+                        {allComplete
+                          ? "Perfect! Deze week wordt automatisch opgeslagen na zondag"
+                          : `${completedCount}/${taskDefinitions.length} taken voltooid • Wordt automatisch gearchiveerd na zondag`}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        );
+
+        const ActivityView = () => (
+          <div>
+            <div className="bg-white rounded-2xl shadow-lg p-6 mb-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCurrentView("tracker")}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-800">
+                    📊 Activiteit
+                  </h1>
+                  <p className="text-gray-600">Recente activiteiten</p>
+                </div>
+              </div>
+            </div>
+
+            {activityLog.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">
+                <Activity size={48} className="mx-auto mb-3 opacity-30" />
+                <p>Nog geen activiteiten</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {activityLog.map((activity, index) => (
+                  <div
+                    key={index}
+                    className="bg-white rounded-xl shadow-md p-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                        {activity.user.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm">
+                          <span className="font-semibold text-gray-800">
+                            {activity.user}
+                          </span>
+                          <span className="text-gray-600">
+                            {" "}
+                            {activity.action}{" "}
+                          </span>
+                          <span className="font-medium text-gray-800">
+                            {activity.task}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {formatTimestamp(activity.timestamp)}
+                        </div>
+                      </div>
+                      {activity.status !== undefined && (
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            activity.status ? "bg-green-100" : "bg-gray-100"
+                          }`}
+                        >
+                          {activity.status ? (
+                            <Check size={14} className="text-green-600" />
+                          ) : (
+                            <X size={14} className="text-gray-400" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+        const HistoryView = () => (
+          <div>
+            <div className="bg-white rounded-2xl shadow-lg p-6 mb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setCurrentView("tracker")}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-800">
+                      📜 Geschiedenis
+                    </h1>
+                    <p className="text-gray-600">
+                      {history.length} voltooide weken
+                    </p>
+                  </div>
+                </div>
+                {history.length > 0 && (
+                  <button
+                    onClick={() => setShowClearConfirm(true)}
+                    className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600"
+                    title="Wis geschiedenis"
+                  >
+                    <X size={20} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {showClearConfirm && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">
+                    Geschiedenis Wissen?
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    Weet je zeker dat je alle {history.length} week
+                    {history.length !== 1 ? "en" : ""} wilt wissen? Dit kan niet
+                    ongedaan worden.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowClearConfirm(false)}
+                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 p-3 rounded-xl font-medium transition-all"
+                    >
+                      Annuleren
+                    </button>
+                    <button
+                      onClick={clearHistory}
+                      className="flex-1 bg-red-500 hover:bg-red-600 text-white p-3 rounded-xl font-medium transition-all"
+                    >
+                      Wissen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {history.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">
+                <History size={48} className="mx-auto mb-3 opacity-30" />
+                <p>Nog geen voltooide weken</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {history.map((week, index) => {
+                  const allTasksComplete = Object.values(week.tasks).every(
+                    Boolean
+                  );
+                  const completedTaskCount = Object.values(week.tasks).filter(
+                    Boolean
+                  ).length;
+
+                  return (
+                    <div
+                      key={index}
+                      className="bg-white rounded-xl shadow-md p-5"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <div className="font-semibold text-gray-800">
+                            Week {week.weekNumber}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {week.dateRange}
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          {allTasksComplete ? (
+                            <span className="text-green-500 text-sm font-medium flex items-center gap-1">
+                              <Check size={16} /> Compleet
+                            </span>
+                          ) : (
+                            <span className="text-orange-500 text-sm font-medium flex items-center gap-1">
+                              {completedTaskCount}/3 Taken
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {Object.entries(week.assignments).map(
+                          ([taskId, person]) => {
+                            const taskDef = taskDefinitions.find(
+                              (t) => t.id === taskId
+                            );
+                            const taskName = taskDef?.name || taskId;
+                            return (
+                              <div
+                                key={taskId}
+                                className="flex items-center justify-between text-sm"
+                              >
+                                <span className="text-gray-600 capitalize">
+                                  {taskName}:
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-gray-800">
+                                    {person}
+                                  </span>
+                                  {week.tasks[taskId] ? (
+                                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                                      <Check
+                                        size={16}
+                                        className="text-green-600"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
+                                      <X size={16} className="text-red-600" />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+
+        const EditView = () => {
+          const [newPersonName, setNewPersonName] = useState("");
+          const [newTaskName, setNewTaskName] = useState("");
+          const [showAddPerson, setShowAddPerson] = useState(false);
+          const [showAddTask, setShowAddTask] = useState(false);
+          const [confirmDeleteTask, setConfirmDeleteTask] = useState(null);
+          const [confirmDeletePerson, setConfirmDeletePerson] = useState(null);
+
+          const removePerson = (person) => {
+            setConfirmDeletePerson(person);
+          };
+
+          const confirmRemovePerson = () => {
+            if (confirmDeletePerson) {
+              updatePeople(people.filter((p) => p !== confirmDeletePerson));
+              updateTaskDefinitions(
+                taskDefinitions.map((task) => ({
+                  ...task,
+                  assignedPeople: task.assignedPeople.filter(
+                    (p) => p !== confirmDeletePerson
+                  ),
+                }))
+              );
+              setConfirmDeletePerson(null);
+            }
+          };
+
+          const addPerson = () => {
+            if (
+              newPersonName.trim() &&
+              !people.includes(newPersonName.trim())
+            ) {
+              updatePeople([...people, newPersonName.trim()]);
+              setNewPersonName("");
+              setShowAddPerson(false);
+            }
+          };
+
+          const removeTask = (index) => {
+            setConfirmDeleteTask(index);
+          };
+
+          const confirmRemoveTask = () => {
+            if (confirmDeleteTask !== null) {
+              const taskToRemove = taskDefinitions[confirmDeleteTask];
+              updateTaskDefinitions(
+                taskDefinitions.filter((_, i) => i !== confirmDeleteTask)
+              );
+              const newTasks = { ...tasks };
+              delete newTasks[taskToRemove.id];
+              updateTasks(newTasks);
+              setConfirmDeleteTask(null);
+            }
+          };
+
+          const addTask = () => {
+            if (newTaskName.trim()) {
+              const newId = newTaskName.toLowerCase().replace(/\s+/g, "_");
+              updateTaskDefinitions([
+                ...taskDefinitions,
+                {
+                  id: newId,
+                  name: newTaskName.trim(),
+                  assignedPeople: [],
+                  expanded: true,
+                },
+              ]);
+              setNewTaskName("");
+              setShowAddTask(false);
+            }
+          };
+
+          const toggleTaskExpand = (index) => {
+            updateTaskDefinitions(
+              taskDefinitions.map((task, i) =>
+                i === index ? { ...task, expanded: !task.expanded } : task
+              )
+            );
+          };
+
+          const togglePersonInTask = (taskIndex, person) => {
+            updateTaskDefinitions(
+              taskDefinitions.map((task, i) => {
+                if (i === taskIndex) {
+                  const isAssigned = task.assignedPeople.includes(person);
+                  return {
+                    ...task,
+                    assignedPeople: isAssigned
+                      ? task.assignedPeople.filter((p) => p !== person)
+                      : [...task.assignedPeople, person],
+                  };
+                }
+                return task;
+              })
+            );
+          };
+
+          return (
+            <div>
+              <div className="bg-white rounded-2xl shadow-lg p-6 mb-4">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setCurrentView("tracker")}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-800">
+                      ⚙️ Instellingen
+                    </h1>
+                    <p className="text-gray-600">Aanpassen en beheren</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-md p-5 mb-4">
+                <h3 className="font-semibold text-gray-700 mb-3">
+                  📅 Week Aanpassen
+                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <div className="text-2xl font-bold text-gray-800">
+                      Week {trackedWeek}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {getWeekDateRange(trackedWeek, currentYear)}
+                    </div>
+                    {(() => {
+                      const currentCalendarWeek = getWeekNumber(new Date());
+                      if (trackedWeek === currentCalendarWeek) {
+                        return (
+                          <div className="text-xs text-green-600 font-medium mt-1">
+                            ✓ Huidige week
+                          </div>
+                        );
+                      } else if (trackedWeek < currentCalendarWeek) {
+                        return (
+                          <div className="text-xs text-gray-500 mt-1">
+                            Verleden week
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => adjustWeek(-1)}
+                      disabled={trackedWeek <= 1}
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold transition-all ${
+                        trackedWeek <= 1
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                      }`}
+                    >
+                      -
+                    </button>
+                    <button
+                      onClick={() => adjustWeek(1)}
+                      disabled={trackedWeek >= getWeekNumber(new Date())}
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold transition-all ${
+                        trackedWeek >= getWeekNumber(new Date())
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                      }`}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    const currentCalendarWeek = getWeekNumber(new Date());
+                    updateTrackedWeek(currentCalendarWeek);
+                  }}
+                  className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 p-3 rounded-lg text-sm font-medium transition-all"
+                >
+                  Reset naar Huidige Kalenderweek
+                </button>
+              </div>
+
+              {/* Manual Assignment for Current Week */}
+              <div className="bg-white rounded-xl shadow-md p-5 mb-4">
+                <h3 className="font-semibold text-gray-700 mb-3">
+                  👤 Wie doet wat deze week?
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Pas de rotatie volgorde aan (verandert wie er aan de beurt is)
+                </p>
+                <div className="space-y-3">
+                  {taskDefinitions.map((taskDef) => (
+                    <div
+                      key={taskDef.id}
+                      className="border border-gray-200 rounded-lg p-3"
+                    >
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {taskDef.name}
+                      </label>
+                      {taskDef.assignedPeople.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {taskDef.assignedPeople.map((person) => (
+                            <button
+                              key={person}
+                              onClick={() => {
+                                const currentAssignment =
+                                  assignments[taskDef.id];
+                                if (person !== currentAssignment) {
+                                  const personIndex =
+                                    taskDef.assignedPeople.indexOf(person);
+                                  const currentIndex =
+                                    (trackedWeek - 1) %
+                                    taskDef.assignedPeople.length;
+                                  const newOffset = personIndex - currentIndex;
+
+                                  updateRotationOffsets({
+                                    ...rotationOffsets,
+                                    [taskDef.id]: newOffset,
+                                  });
+                                  logActivity(
+                                    "wijzigde rotatie",
+                                    `${taskDef.name} → ${person}`,
+                                    true
+                                  );
+                                }
+                              }}
+                              className={`px-4 py-2 rounded-lg border-2 transition-all ${
+                                assignments[taskDef.id] === person
+                                  ? "border-blue-500 bg-blue-50 text-blue-700 font-medium"
+                                  : "border-gray-200 hover:border-gray-300 text-gray-700"
+                              }`}
+                            >
+                              {person}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic">
+                          Geen personen toegewezen aan deze taak
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* People Section */}
+              <div className="bg-white rounded-xl shadow-md p-5 mb-4">
+                <h3 className="font-semibold text-gray-700 mb-3">
+                  👥 Huisgenoten
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {people.map((person) => (
+                    <div
+                      key={person}
+                      className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full font-medium"
+                    >
+                      <span>{person}</span>
+                      <button
+                        onClick={() => removePerson(person)}
+                        className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {showAddPerson ? (
+                    <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-3 py-2 rounded-full">
+                      <input
+                        type="text"
+                        value={newPersonName}
+                        onChange={(e) => setNewPersonName(e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && addPerson()}
+                        placeholder="Naam..."
+                        className="bg-transparent border-none outline-none w-24 text-sm"
+                        autoFocus
+                      />
+                      <button
+                        onClick={addPerson}
+                        className="hover:bg-green-200 rounded-full p-0.5"
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAddPerson(false);
+                          setNewPersonName("");
+                        }}
+                        className="hover:bg-green-200 rounded-full p-0.5"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowAddPerson(true)}
+                      className="inline-flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-full font-medium transition-colors"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Tasks Section */}
+              <div className="bg-white rounded-xl shadow-md p-5 mb-4">
+                <h3 className="font-semibold text-gray-700 mb-3">📋 Taken</h3>
+                <div className="space-y-3">
+                  {taskDefinitions.map((task, index) => (
+                    <div
+                      key={index}
+                      className="border-2 border-gray-200 rounded-xl overflow-hidden"
+                    >
+                      <div
+                        onClick={() => toggleTaskExpand(index)}
+                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          {task.expanded ? (
+                            <ChevronDown size={20} className="text-gray-500" />
+                          ) : (
+                            <ChevronRight size={20} className="text-gray-500" />
+                          )}
+                          <span className="font-semibold text-gray-800">
+                            {task.name}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            ({task.assignedPeople.length}{" "}
+                            {task.assignedPeople.length === 1
+                              ? "persoon"
+                              : "personen"}
+                            )
+                          </span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeTask(index);
+                          }}
+                          className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      {task.expanded && (
+                        <div className="p-4 pt-0 border-t border-gray-200 bg-gray-50">
+                          <div className="mt-3">
+                            <p className="text-sm font-medium text-gray-700 mb-2">
+                              Wie kan dit doen?
+                            </p>
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {task.assignedPeople.map((person) => (
+                                <button
+                                  key={person}
+                                  onClick={() =>
+                                    togglePersonInTask(index, person)
+                                  }
+                                  className="inline-flex items-center gap-2 bg-green-100 hover:bg-green-200 text-green-700 px-3 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer"
+                                >
+                                  <span>✓ {person}</span>
+                                  <X size={14} />
+                                </button>
+                              ))}
+                            </div>
+
+                            {people.filter(
+                              (p) => !task.assignedPeople.includes(p)
+                            ).length > 0 && (
+                              <div>
+                                <p className="text-xs text-gray-500 mb-2">
+                                  Voeg toe:
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {people
+                                    .filter(
+                                      (p) => !task.assignedPeople.includes(p)
+                                    )
+                                    .map((person) => (
+                                      <button
+                                        key={person}
+                                        onClick={() =>
+                                          togglePersonInTask(index, person)
+                                        }
+                                        className="inline-flex items-center gap-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
+                                      >
+                                        <Plus size={14} />
+                                        {person}
+                                      </button>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {task.assignedPeople.length > 1 && (
+                              <div className="mt-4 pt-3 border-t border-gray-200">
+                                <p className="text-sm text-gray-600">
+                                  🔄 Automatisch rouleren:{" "}
+                                  <span className="font-medium text-green-600">
+                                    Ingeschakeld
+                                  </span>
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Wisselt wekelijks tussen{" "}
+                                  {task.assignedPeople.join(" en ")}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Add Task */}
+                  {showAddTask ? (
+                    <div className="border-2 border-dashed border-green-300 rounded-xl p-4 bg-green-50">
+                      <input
+                        type="text"
+                        value={newTaskName}
+                        onChange={(e) => setNewTaskName(e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && addTask()}
+                        placeholder="Nieuwe taak naam..."
+                        className="w-full px-3 py-2 border border-green-300 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={addTask}
+                          className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                        >
+                          Toevoegen
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowAddTask(false);
+                            setNewTaskName("");
+                          }}
+                          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition-colors"
+                        >
+                          Annuleer
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowAddTask(true)}
+                      className="w-full border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 rounded-xl p-4 text-gray-600 hover:text-blue-600 font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Plus size={20} />
+                      Nieuwe Taak
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Confirm Delete Modals */}
+              {confirmDeleteTask !== null && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                  <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">
+                      Taak Verwijderen?
+                    </h3>
+                    <p className="text-gray-600 mb-6">
+                      Weet je zeker dat je "
+                      {taskDefinitions[confirmDeleteTask]?.name}" wilt
+                      verwijderen?
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setConfirmDeleteTask(null)}
+                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 p-3 rounded-xl font-medium transition-all"
+                      >
+                        Annuleren
+                      </button>
+                      <button
+                        onClick={confirmRemoveTask}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white p-3 rounded-xl font-medium transition-all"
+                      >
+                        Verwijderen
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {confirmDeletePerson && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                  <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">
+                      Persoon Verwijderen?
+                    </h3>
+                    <p className="text-gray-600 mb-6">
+                      Weet je zeker dat je {confirmDeletePerson} wilt
+                      verwijderen? Ze worden ook uit alle taken verwijderd.
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setConfirmDeletePerson(null)}
+                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 p-3 rounded-xl font-medium transition-all"
+                      >
+                        Annuleren
+                      </button>
+                      <button
+                        onClick={confirmRemovePerson}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white p-3 rounded-xl font-medium transition-all"
+                      >
+                        Verwijderen
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <p className="text-sm text-blue-800">
+                  💡 <strong>Tip:</strong> Taken met meerdere personen rouleren
+                  automatisch per week. Wijs één persoon toe voor een vaste
+                  taak.
+                </p>
+              </div>
+            </div>
+          );
+        };
+
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 pb-8">
+            <div className="max-w-md mx-auto">
+              {currentView === "tracker" && <TrackerView />}
+              {currentView === "activity" && <ActivityView />}
+              {currentView === "history" && <HistoryView />}
+              {currentView === "edit" && <EditView />}
+            </div>
+          </div>
+        );
+      }
+
+      // Render the app
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<CleaningTracker />);
     </script>
-</body>
+  </body>
 </html>

@@ -1,0 +1,11 @@
+{
+  "name": "schoonmaak-tracker",
+  "version": "1.0.0",
+  "description": "Zwaanshals Schoonmaak Tracker",
+  "scripts": {
+    "start": "npx http-server -p 8000 -o"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
