@@ -301,7 +301,7 @@
       const getNextSunday = () => {
         const now = new Date();
         const dayOfWeek = now.getDay();
-        const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek;
+        const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
         const sunday = new Date(now);
         sunday.setDate(now.getDate() + daysUntilSunday);
         sunday.setHours(23, 59, 59, 999);
