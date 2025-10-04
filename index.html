@@ -410,7 +410,7 @@
         useEffect(() => {
           const interval = setInterval(() => {
             setTimeUntilDeadline(getTimeUntilDeadline());
-          }, 60000); // Update every minute
+          }, 3600000); // 1 hour = 3600000ms
           return () => clearInterval(interval);
         }, []);
 
