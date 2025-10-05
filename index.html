@@ -2688,6 +2688,25 @@
           checkAndArchiveOldWeeks();
         }, [trackedWeek, history, tasks, taskDefinitions]);
 
+        // Auto-advance to current week effect
+        useEffect(() => {
+          const autoAdvanceWeek = async () => {
+            // Only run if not loading and tracked week is behind current week
+            if (!isLoading && trackedWeek < currentCalendarWeek) {
+              // First, archive the old week
+              await checkAndArchiveOldWeeks();
+
+              // Then update to current week
+              updateTrackedWeek(currentCalendarWeek);
+            }
+          };
+
+          // Run once after initial load
+          if (!isLoading) {
+            autoAdvanceWeek();
+          }
+        }, [isLoading]);
+
         // Business Logic Functions with retry support
         const logActivity = async (action, task, status) => {
           const activity = {
@@ -2833,7 +2852,7 @@
           );
         };
 
-        const checkAndArchiveOldWeeks = () => {
+        const checkAndArchiveOldWeeks = async () => {
           if (trackedWeek < currentCalendarWeek) {
             const alreadyCompleted = history.some(
               (week) =>
@@ -2841,27 +2860,53 @@
             );
 
             if (!alreadyCompleted) {
-              const weekData = {
-                weekNumber: trackedWeek,
-                year: currentYear,
-                dateRange: getWeekDateRange(trackedWeek, currentYear),
-                completedDate: new Date().toISOString(),
-                assignments: { ...assignments },
-                tasks: { ...tasks },
-                autoArchived: true,
-              };
+              // Fetch tasks from Firebase for the week being archived
+              try {
+                const weekTasksSnapshot = await database
+                  .ref(`tasksByWeek/${trackedWeek}`)
+                  .once("value");
+                const weekTasks = weekTasksSnapshot.val() || {};
 
-              const newHistory = [...history, weekData].sort((a, b) => {
-                if (a.year !== b.year) return b.year - a.year;
-                return b.weekNumber - a.weekNumber;
-              });
+                // Calculate assignments for the archived week
+                const archivedAssignments = {};
+                taskDefinitions.forEach((taskDef) => {
+                  const assignedPeople = taskDef.assignedPeople || [];
+                  if (assignedPeople.length > 1) {
+                    const offset = rotationOffsets[taskDef.id] || 0;
+                    const index =
+                      (trackedWeek - 1 + offset) % assignedPeople.length;
+                    archivedAssignments[taskDef.id] = assignedPeople[index];
+                  } else if (assignedPeople.length > 0) {
+                    archivedAssignments[taskDef.id] = assignedPeople[0];
+                  } else {
+                    archivedAssignments[taskDef.id] = "Niemand";
+                  }
+                });
 
-              updateHistory(newHistory);
-              logActivity(
-                "automatisch gearchiveerd",
-                `Week ${trackedWeek}`,
-                true
-              );
+                const weekData = {
+                  weekNumber: trackedWeek,
+                  year: currentYear,
+                  dateRange: getWeekDateRange(trackedWeek, currentYear),
+                  completedDate: new Date().toISOString(),
+                  assignments: archivedAssignments,
+                  tasks: weekTasks,
+                  autoArchived: true,
+                };
+
+                const newHistory = [...history, weekData].sort((a, b) => {
+                  if (a.year !== b.year) return b.year - a.year;
+                  return b.weekNumber - a.weekNumber;
+                });
+
+                updateHistory(newHistory);
+                logActivity(
+                  "automatisch gearchiveerd",
+                  `Week ${trackedWeek}`,
+                  true
+                );
+              } catch (error) {
+                console.error("Error archiving old week:", error);
+              }
             }
           }
         };
