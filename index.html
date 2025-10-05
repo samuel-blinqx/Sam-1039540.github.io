@@ -1447,8 +1447,10 @@
                 if (week.tasks[taskId]) {
                   stats[person].completedTasks += taskPoints;
 
-                  // Check if it was late (completed after auto-archive)
-                  if (week.autoArchived) {
+                  // Check if task was completed late
+                  const isLate =
+                    week.lateTasks && week.lateTasks.includes(taskId);
+                  if (isLate) {
                     stats[person].lateTasks += taskPoints * 0.5;
                   } else {
                     stats[person].onTimeTasks += taskPoints;
@@ -1493,8 +1495,8 @@
 
         const stats = calculateStats();
 
-        // Create leaderboard with weighted scoring (sort by points, then by streak)
-        // Weighted scoring: On-time = 1.0, Late = 0.5, Missed = 0
+        // Create leaderboard (sort by points, then by streak)
+        // Scoring: On-time = 1.0x points, Late = 0.5x points, Missed = 0, Dishwasher bonus included
         const leaderboard = people
           .map((person) => ({
             name: person,
@@ -1547,8 +1549,8 @@
               <div className="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4 rounded">
                 <p className="text-xs text-blue-800">
                   <span className="font-semibold">Punten:</span> Op tijd =
-                  taakpunten, Te laat = 50% taakpunten, Vaatwasser bonus telt
-                  ook mee
+                  taakpunten, Te laat (na deadline) = 50% taakpunten, Vaatwasser
+                  bonus telt ook mee
                 </p>
               </div>
             )}
@@ -2688,7 +2690,7 @@
           checkAndArchiveOldWeeks();
         }, [trackedWeek, history, tasks, taskDefinitions]);
 
-        // Auto-advance to current week effect
+        // Auto-advance to current week effect (only on initial load)
         useEffect(() => {
           const autoAdvanceWeek = async () => {
             // Only run if not loading and tracked week is behind current week
@@ -2701,11 +2703,11 @@
             }
           };
 
-          // Run when loading completes or when trackedWeek changes
+          // Run only once when loading completes
           if (!isLoading) {
             autoAdvanceWeek();
           }
-        }, [isLoading, trackedWeek, currentCalendarWeek]);
+        }, [isLoading]);
 
         // Business Logic Functions with retry support
         const logActivity = async (action, task, status) => {
@@ -2845,6 +2847,32 @@
           updateTasks(newTasks);
           const taskName =
             taskDefinitions.find((t) => t.id === taskId)?.name || taskId;
+
+          // If completing a task in a past week, mark it as late in history
+          if (isPastWeek && newStatus) {
+            const weekInHistory = history.find(
+              (week) =>
+                week.weekNumber === trackedWeek && week.year === currentYear
+            );
+
+            if (weekInHistory) {
+              const updatedHistory = history.map((week) => {
+                if (
+                  week.weekNumber === trackedWeek &&
+                  week.year === currentYear
+                ) {
+                  return {
+                    ...week,
+                    tasks: { ...week.tasks, [taskId]: true },
+                    lateTasks: [...(week.lateTasks || []), taskId],
+                  };
+                }
+                return week;
+              });
+              updateHistory(updatedHistory);
+            }
+          }
+
           logActivity(
             newStatus ? "afgevinkt" : "uitgevinkt",
             taskName,
@@ -2890,6 +2918,7 @@
                   completedDate: new Date().toISOString(),
                   assignments: archivedAssignments,
                   tasks: weekTasks,
+                  lateTasks: [], // Initialize empty - tasks completed later will be added here
                   autoArchived: true,
                 };
 
