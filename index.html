@@ -966,7 +966,7 @@
               }`}
             >
               {canEmptyDishwasherToday()
-                ? "🍽️ Leeg Vaatwasser!"
+                ? "🍽️ Vaatwasser geleegd?"
                 : trackedWeek < currentCalendarWeek
                 ? "🔒 Verleden week"
                 : "✓ Al Gedaan Vandaag"}
@@ -2701,11 +2701,11 @@
             }
           };
 
-          // Run once after initial load
+          // Run when loading completes or when trackedWeek changes
           if (!isLoading) {
             autoAdvanceWeek();
           }
-        }, [isLoading]);
+        }, [isLoading, trackedWeek, currentCalendarWeek]);
 
         // Business Logic Functions with retry support
         const logActivity = async (action, task, status) => {
