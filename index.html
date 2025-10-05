@@ -964,15 +964,15 @@
               disabled={!canEmptyDishwasherToday()}
               className={`w-full p-3 rounded-lg font-semibold transition-all ${
                 canEmptyDishwasherToday()
-                  ? "bg-green-500 hover:bg-green-600 text-white shadow-md active:scale-95"
+                  ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md active:scale-95"
                   : "bg-gray-200 text-gray-500 cursor-not-allowed"
               }`}
             >
               {canEmptyDishwasherToday()
-                ? "✓ Vaatwasser Geleegd!"
+                ? "🍽️ Leeg Vaatwasser!"
                 : trackedWeek < currentCalendarWeek
                 ? "🔒 Verleden week"
-                : `🔒 Al gedaan vandaag`}
+                : "✓ Al Gedaan Vandaag"}
             </button>
 
             {!canEmptyDishwasherToday() && getLastDishwasherLog() && (
