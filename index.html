@@ -62,7 +62,7 @@
       // 📦 SECTION: Config & Setup
       // ============================================================================
 
-      const { useState, useEffect, useMemo, useRef } = React;
+      const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
       const firebaseConfigDev = {
         apiKey: "AIzaSyBWQt7JoTp9xpMbWlFqDZXGu99hbbo6KNQ",
@@ -476,8 +476,9 @@
         return `${formatDate(monday)} - ${formatDate(sunday)}`;
       };
 
-      const getNextSunday = () => {
-        const now = new Date();
+      const getNextSunday = (currentDate = new Date()) => {
+        const now =
+          currentDate instanceof Date ? currentDate : new Date(currentDate);
         const dayOfWeek = now.getDay();
         const daysUntilSunday =
           dayOfWeek === SUNDAY ? 0 : DAYS_IN_WEEK - dayOfWeek;
@@ -492,17 +493,18 @@
         return sunday;
       };
 
-      const getNextSundayFormatted = () => {
-        const sunday = getNextSunday();
+      const getNextSundayFormatted = (currentDate = new Date()) => {
+        const sunday = getNextSunday(currentDate);
         return sunday.toLocaleDateString("nl-NL", {
           day: "numeric",
           month: "long",
         });
       };
 
-      const getTimeUntilDeadline = () => {
-        const now = new Date();
-        const sunday = getNextSunday();
+      const getTimeUntilDeadline = (currentDate = new Date()) => {
+        const now =
+          currentDate instanceof Date ? currentDate : new Date(currentDate);
+        const sunday = getNextSunday(now);
         const diff = sunday - now;
 
         const days = Math.floor(diff / MS_PER_DAY);
@@ -804,6 +806,7 @@
         trackedWeek,
         currentYear,
         currentCalendarWeek,
+        currentDate,
         taskDefinitions,
         tasks,
         assignments,
@@ -926,7 +929,7 @@
             <Clock size={24} className="text-orange-600" />
             <div className="flex-1">
               <div className="font-semibold text-gray-800">
-                Deadline: Zondag {getNextSundayFormatted()}
+                Deadline: Zondag {getNextSundayFormatted(currentDate)}
               </div>
               <div className="text-sm text-gray-600">
                 {timeUntilDeadline} resterend
@@ -1376,163 +1379,47 @@
         );
       };
 
-      const StatsView = ({
-        setCurrentView,
-        people,
-        history,
-        activityLog,
-        taskDefinitions,
-        dishwasherLogs,
-      }) => {
-        // Filter history to only show week 40 onwards from 2025, and all weeks from 2026+
+      const StatsView = ({ setCurrentView, people, history }) => {
+        // Just read leaderboard from Firebase - don't recalculate!
+        const [leaderboardData, setLeaderboardData] = useState(null);
+
+        useEffect(() => {
+          const leaderboardRef = database.ref("leaderboard");
+
+          const handleUpdate = (snapshot) => {
+            const data = snapshot.val();
+            console.log("📊 Leaderboard updated from Firebase:", data);
+            setLeaderboardData(data);
+          };
+
+          leaderboardRef.on("value", handleUpdate);
+
+          return () => {
+            leaderboardRef.off("value", handleUpdate);
+          };
+        }, []);
+
+        // Filter history
         const STARTING_YEAR = 2025;
         const STARTING_WEEK = 40;
         const filteredHistory = history.filter((week) => {
-          if (week.year > STARTING_YEAR) return true; // All weeks from 2026+
+          if (week.year > STARTING_YEAR) return true;
           if (week.year === STARTING_YEAR)
-            return week.weekNumber >= STARTING_WEEK; // Week 40+ from 2025
-          return false; // Before 2025
+            return week.weekNumber >= STARTING_WEEK;
+          return false;
         });
 
-        // Calculate stats for each person
-        const calculateStats = () => {
-          const stats = {};
-
-          people.forEach((person) => {
-            stats[person] = {
-              totalTasks: 0,
-              completedTasks: 0,
-              onTimeTasks: 0,
-              lateTasks: 0,
-              missedTasks: 0,
-              currentStreak: 0,
-              lastFourWeeks: [],
-              dishwasherPoints: 0,
-            };
-          });
-
-          // Analyze history (sorted newest first)
-          const sortedHistory = [...filteredHistory].sort((a, b) => {
-            if (a.year !== b.year) return b.year - a.year;
-            return b.weekNumber - a.weekNumber;
-          });
-
-          // Get last 4 weeks for chart
-          sortedHistory
-            .slice(0, 4)
-            .reverse()
-            .forEach((week) => {
-              people.forEach((person) => {
-                const personTasks = Object.entries(week.assignments)
-                  .filter(([_, assignedPerson]) => assignedPerson === person)
-                  .map(([taskId]) => ({
-                    taskId,
-                    completed: week.tasks[taskId] || false,
-                  }));
-
-                const completed = personTasks.filter((t) => t.completed).length;
-                const total = personTasks.length;
-
-                stats[person].lastFourWeeks.push({
-                  week: week.weekNumber,
-                  completed,
-                  total,
-                  percentage: total > 0 ? (completed / total) * 100 : 0,
-                });
-              });
-            });
-
-          // Calculate overall stats from all history
-          sortedHistory.forEach((week) => {
-            people.forEach((person) => {
-              const personTasks = Object.entries(week.assignments).filter(
-                ([_, assignedPerson]) => assignedPerson === person
-              );
-
-              personTasks.forEach(([taskId]) => {
-                // Use frozen point values from history, default to 1.0 if not snapshotted
-                const taskPoints = week.taskPoints?.[taskId] || 1.0;
-
-                stats[person].totalTasks += taskPoints;
-
-                if (week.tasks[taskId]) {
-                  stats[person].completedTasks += taskPoints;
-
-                  // Check if task was completed late
-                  const isLate =
-                    week.lateTasks && week.lateTasks.includes(taskId);
-                  if (isLate) {
-                    stats[person].lateTasks += taskPoints * 0.5;
-                  } else {
-                    stats[person].onTimeTasks += taskPoints;
-                  }
-                } else {
-                  stats[person].missedTasks += taskPoints;
-                }
-              });
-            });
-          });
-
-          // Calculate current streak (consecutive weeks with all tasks done)
-          people.forEach((person) => {
-            let streak = 0;
-            for (const week of sortedHistory) {
-              const personTasks = Object.entries(week.assignments).filter(
-                ([_, assignedPerson]) => assignedPerson === person
-              );
-
-              const allCompleted = personTasks.every(
-                ([taskId]) => week.tasks[taskId]
-              );
-
-              if (allCompleted && personTasks.length > 0) {
-                streak++;
-              } else {
-                break;
+        // Convert leaderboard data to array and sort
+        const leaderboard = leaderboardData
+          ? Object.values(leaderboardData).sort((a, b) => {
+              if (Math.abs(a.totalPoints - b.totalPoints) > 0.1) {
+                return b.totalPoints - a.totalPoints;
               }
-            }
-            stats[person].currentStreak = streak;
-          });
+              return 0;
+            })
+          : [];
 
-          // Calculate dishwasher bonus points
-          dishwasherLogs.forEach((log) => {
-            if (stats[log.user]) {
-              stats[log.user].dishwasherPoints += log.points;
-            }
-          });
-
-          return stats;
-        };
-
-        const stats = calculateStats();
-
-        // Create leaderboard (sort by points, then by streak)
-        // Scoring: On-time = 1.0x points, Late = 0.5x points, Missed = 0, Dishwasher bonus included
-        const leaderboard = people
-          .map((person) => ({
-            name: person,
-            ...stats[person],
-            points:
-              stats[person].onTimeTasks +
-              stats[person].lateTasks +
-              stats[person].dishwasherPoints,
-            maxPoints: stats[person].totalTasks,
-            completionRate:
-              stats[person].totalTasks > 0
-                ? ((stats[person].onTimeTasks +
-                    stats[person].lateTasks +
-                    stats[person].dishwasherPoints) /
-                    stats[person].totalTasks) *
-                  100
-                : 0,
-          }))
-          .sort((a, b) => {
-            // Sort by points, then by streak
-            if (Math.abs(a.points - b.points) > 0.1) {
-              return b.points - a.points;
-            }
-            return b.currentStreak - a.currentStreak;
-          });
+        console.log("📊 Current leaderboard:", leaderboard);
 
         return (
           <div>
@@ -1566,6 +1453,22 @@
               </div>
             )}
 
+            {/* Debug info - remove this after fixing */}
+            {leaderboard.length > 0 && (
+              <div className="bg-yellow-50 border-l-4 border-yellow-500 p-3 mb-4 rounded text-xs">
+                <p className="font-semibold text-yellow-800 mb-2">
+                  Debug Info:
+                </p>
+                {leaderboard.map((person) => (
+                  <div key={person.name} className="text-yellow-700">
+                    {person.name}: {person.totalPoints.toFixed(2)} pts (onTime:{" "}
+                    {person.onTimeTasks}, late: {person.lateTasks}, dishwasher:{" "}
+                    {person.dishwasherPoints})
+                  </div>
+                ))}
+              </div>
+            )}
+
             {leaderboard.length > 0 && (
               <>
                 {/* Podium for top 3 */}
@@ -1582,19 +1485,9 @@
                           {leaderboard[1].name}
                         </div>
                         <div className="text-2xl font-bold text-gray-700">
-                          {leaderboard[1].points % 1 === 0
-                            ? leaderboard[1].points
-                            : leaderboard[1].points.toFixed(2)}
+                          {leaderboard[1].totalPoints.toFixed(2)}
                         </div>
                         <div className="text-xs text-gray-600">punten</div>
-                        {leaderboard[1].currentStreak > 0 && (
-                          <div className="mt-2 text-orange-600 font-medium text-sm">
-                            🔥 {leaderboard[1].currentStreak}{" "}
-                            {leaderboard[1].currentStreak === 1
-                              ? "week"
-                              : "weken"}
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
@@ -1606,7 +1499,7 @@
                         <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg">
                           👑 Schoonste Zwaan
                         </div>
-                        <div className="text-6xl mb-2 animate-bounce">🦢</div>
+                        <div className="text-6xl mb-2">🦢</div>
                         <div className="text-5xl font-bold text-yellow-900 mb-1">
                           1
                         </div>
@@ -1614,19 +1507,9 @@
                           {leaderboard[0].name}
                         </div>
                         <div className="text-3xl font-bold text-yellow-900">
-                          {leaderboard[0].points % 1 === 0
-                            ? leaderboard[0].points
-                            : leaderboard[0].points.toFixed(2)}
+                          {leaderboard[0].totalPoints.toFixed(2)}
                         </div>
                         <div className="text-sm text-yellow-800">punten</div>
-                        {leaderboard[0].currentStreak > 0 && (
-                          <div className="mt-2 text-orange-600 font-bold text-sm">
-                            🔥 {leaderboard[0].currentStreak}{" "}
-                            {leaderboard[0].currentStreak === 1
-                              ? "week"
-                              : "weken"}
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
@@ -1643,25 +1526,15 @@
                           {leaderboard[2].name}
                         </div>
                         <div className="text-xl font-bold text-orange-700">
-                          {leaderboard[2].points % 1 === 0
-                            ? leaderboard[2].points
-                            : leaderboard[2].points.toFixed(2)}
+                          {leaderboard[2].totalPoints.toFixed(2)}
                         </div>
                         <div className="text-xs text-orange-600">punten</div>
-                        {leaderboard[2].currentStreak > 0 && (
-                          <div className="mt-2 text-orange-600 font-medium text-xs">
-                            🔥 {leaderboard[2].currentStreak}{" "}
-                            {leaderboard[2].currentStreak === 1
-                              ? "week"
-                              : "weken"}
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Bottom rankings - All dogs */}
+                {/* Bottom rankings */}
                 {leaderboard.length > 3 && (
                   <div className="space-y-3 mt-16">
                     {leaderboard.slice(3).map((person, index) => {
@@ -1694,9 +1567,7 @@
                             </div>
                             <div className="text-right">
                               <div className="text-3xl font-bold text-gray-800">
-                                {person.points % 1 === 0
-                                  ? person.points
-                                  : person.points.toFixed(2)}
+                                {person.totalPoints.toFixed(2)}
                               </div>
                               <div className="text-xs text-gray-500">
                                 punten
@@ -1718,7 +1589,7 @@
                   <div>
                     <div className="text-2xl font-bold text-gray-800">
                       {leaderboard
-                        .reduce((sum, p) => sum + p.totalTasks, 0)
+                        .reduce((sum, p) => sum + p.totalPoints, 0)
                         .toFixed(1)}
                     </div>
                     <div className="text-xs text-gray-600">Totale punten</div>
@@ -1730,31 +1601,11 @@
                     </div>
                     <div className="text-xs text-gray-600">Weken</div>
                   </div>
-                  <div className="w-px h-12 bg-gray-300"></div>
-                  <div>
-                    <div className="text-2xl font-bold text-blue-600">
-                      {filteredHistory.length > 0 ? (
-                        <>
-                          {(
-                            leaderboard.reduce(
-                              (sum, p) => sum + p.completionRate,
-                              0
-                            ) / leaderboard.length
-                          ).toFixed(0)}
-                          %
-                        </>
-                      ) : (
-                        "0%"
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-600">Huis gemiddelde</div>
-                  </div>
                 </div>
               </div>
             )}
 
-            {/* Encouragement message when no history yet */}
-            {filteredHistory.length === 0 && (
+            {leaderboard.length === 0 && (
               <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-xl p-6 mt-4 text-center">
                 <div className="text-4xl mb-3">🏁</div>
                 <h3 className="text-lg font-bold text-gray-800 mb-2">
@@ -1792,6 +1643,8 @@
         setCurrentView,
         currentUser,
         activityLog,
+        testDate,
+        setTestDate,
       }) => {
         const [newPersonName, setNewPersonName] = useState("");
         const [newTaskName, setNewTaskName] = useState("");
@@ -2068,6 +1921,58 @@
               >
                 Reset naar Huidige Kalenderweek
               </button>
+            </div>
+
+            {/* Test Date Override (for testing week transitions) */}
+            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-xl shadow-md p-5 mb-4">
+              <h3 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                🧪 Test Datum (Ontwikkelaar Tool)
+              </h3>
+              <p className="text-sm text-orange-700 mb-3">
+                Simuleer een andere datum om week overgangen te testen
+              </p>
+              <div className="space-y-3">
+                <input
+                  type="datetime-local"
+                  value={testDate || ""}
+                  onChange={(e) => setTestDate(e.target.value)}
+                  className="w-full px-4 py-2 border-2 border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                {testDate && (
+                  <div className="bg-white/50 p-3 rounded-lg">
+                    <div className="text-sm font-medium text-orange-800">
+                      Gesimuleerde datum:{" "}
+                      {new Date(testDate).toLocaleString("nl-NL")}
+                    </div>
+                    <div className="text-sm text-orange-700">
+                      Week: {getWeekNumber(new Date(testDate))} van{" "}
+                      {new Date(testDate).getFullYear()}
+                    </div>
+                  </div>
+                )}
+                <button
+                  onClick={() => setTestDate(null)}
+                  className="w-full bg-orange-100 hover:bg-orange-200 text-orange-800 p-3 rounded-lg text-sm font-medium transition-all"
+                >
+                  Reset naar Echte Datum
+                </button>
+                <button
+                  onClick={() =>
+                    setTestDate(
+                      new Date("2025-10-12T00:00").toISOString().slice(0, 16)
+                    )
+                  }
+                  className="w-full bg-blue-100 hover:bg-blue-200 text-blue-800 p-3 rounded-lg text-sm font-medium transition-all"
+                >
+                  Test 12 Oktober 2025 (Week Overgang)
+                </button>
+              </div>
+              <div className="mt-3 bg-red-100 border-l-4 border-red-500 p-3 rounded">
+                <p className="text-xs text-red-800">
+                  ⚠️ Let op: Dit is alleen voor testen! Reset na gebruik naar de
+                  echte datum.
+                </p>
+              </div>
             </div>
 
             {/* Manual Assignment for Current Week */}
@@ -2494,17 +2399,137 @@
           getWeekNumber(new Date())
         );
         const [isLoading, setIsLoading] = useState(true);
-        const [timeUntilDeadline, setTimeUntilDeadline] = useState(
-          getTimeUntilDeadline()
-        );
-
         const [showInstallGuide, setShowInstallGuide] = useState(false);
+        const [testDate, setTestDate] = useState(null); // For testing week transitions
 
         // Memoized calculations (only recalculate when needed)
-        const currentYear = useMemo(() => new Date().getFullYear(), []);
+        const currentDate = testDate ? new Date(testDate) : new Date();
+        const currentYear = useMemo(
+          () => currentDate.getFullYear(),
+          [testDate]
+        );
         const currentCalendarWeek = useMemo(
-          () => getWeekNumber(new Date()),
-          []
+          () => getWeekNumber(currentDate),
+          [testDate]
+        );
+
+        const [timeUntilDeadline, setTimeUntilDeadline] = useState(
+          getTimeUntilDeadline(currentDate)
+        );
+
+        // Helper: Calculate assignment for a task in a given week
+        const getTaskAssignment = useCallback(
+          (taskDef, weekNumber) => {
+            const assignedPeople = taskDef.assignedPeople || [];
+            if (assignedPeople.length === 0) return null;
+            if (assignedPeople.length === 1) return assignedPeople[0];
+
+            const offset = rotationOffsets[taskDef.id] || 0;
+            const index = (weekNumber - 1 + offset) % assignedPeople.length;
+            return assignedPeople[index];
+          },
+          [rotationOffsets]
+        );
+
+        // Recalculate leaderboard function
+        const recalculateLeaderboard = useCallback(
+          async (historyData, dishwasherLogsData = null) => {
+            console.log("🔄 RECALCULATING LEADERBOARD", {
+              trackedWeek,
+              currentCalendarWeek,
+              currentYear,
+              isCurrentWeekArchived: historyData.some(
+                (week) =>
+                  week.weekNumber === trackedWeek && week.year === currentYear
+              ),
+              currentTasks: tasks,
+              taskDefinitions: taskDefinitions.map((t) => ({
+                id: t.id,
+                points: t.points,
+              })),
+            });
+
+            try {
+              const logsToUse = dishwasherLogsData || dishwasherLogs;
+              const scores = {};
+
+              // Initialize scores
+              people.forEach((person) => {
+                scores[person] = {
+                  name: person,
+                  onTimeTasks: 0,
+                  lateTasks: 0,
+                  dishwasherPoints: 0,
+                  totalPoints: 0,
+                };
+              });
+
+              // Add points from archived weeks
+              historyData.forEach((week) => {
+                Object.entries(week.assignments).forEach(([taskId, person]) => {
+                  if (!week.tasks[taskId] || !scores[person]) return;
+
+                  const taskPoints = week.taskPoints?.[taskId] || 1.0;
+                  const isLate = week.lateTasks?.includes(taskId);
+
+                  scores[person][isLate ? "lateTasks" : "onTimeTasks"] +=
+                    taskPoints * (isLate ? 0.5 : 1.0);
+                });
+              });
+
+              // Add current week's points if not archived
+              const isCurrentWeekArchived = historyData.some(
+                (week) =>
+                  week.weekNumber === trackedWeek && week.year === currentYear
+              );
+
+              if (
+                !isCurrentWeekArchived &&
+                trackedWeek <= currentCalendarWeek
+              ) {
+                taskDefinitions.forEach((taskDef) => {
+                  if (!tasks[taskDef.id]) return;
+
+                  const assignedPerson = getTaskAssignment(
+                    taskDef,
+                    trackedWeek
+                  );
+                  if (assignedPerson && scores[assignedPerson]) {
+                    scores[assignedPerson].onTimeTasks += taskDef.points || 1.0;
+                  }
+                });
+              }
+
+              // Add dishwasher points
+              logsToUse.forEach((log) => {
+                if (scores[log.user]) {
+                  scores[log.user].dishwasherPoints += log.points;
+                }
+              });
+
+              // Calculate totals
+              Object.values(scores).forEach((score) => {
+                score.totalPoints =
+                  score.onTimeTasks + score.lateTasks + score.dishwasherPoints;
+              });
+
+              await retryWithBackoff(() =>
+                database.ref("leaderboard").set(scores)
+              );
+            } catch (error) {
+              console.error("Error recalculating leaderboard:", error);
+            }
+          },
+          [
+            people,
+            dishwasherLogs,
+            trackedWeek,
+            currentYear,
+            currentCalendarWeek,
+            taskDefinitions,
+            tasks,
+            getTaskAssignment,
+          ]
         );
 
         // Firebase Sync Effect
@@ -2635,30 +2660,48 @@
 
         // Deadline Timer Effect
         useEffect(() => {
-          const interval = setInterval(() => {
-            setTimeUntilDeadline(getTimeUntilDeadline());
-          }, DEADLINE_UPDATE_INTERVAL);
+          const updateDeadline = () => {
+            const date = testDate ? new Date(testDate) : new Date();
+            setTimeUntilDeadline(getTimeUntilDeadline(date));
+          };
+
+          updateDeadline(); // Update immediately
+          const interval = setInterval(
+            updateDeadline,
+            DEADLINE_UPDATE_INTERVAL
+          );
           return () => clearInterval(interval);
-        }, []);
+        }, [testDate]);
 
-        const updateDishwasherLogs = async (newLogs) => {
-          try {
-            await retryWithBackoff(() =>
-              database.ref("dishwasherLogs").set(newLogs)
-            );
-            // Recalculate leaderboard when dishwasher points change
-            await recalculateLeaderboard(history);
-          } catch (error) {
-            handleFirebaseError(error, "vaatwasser logs bijwerken");
+        // Recalculate leaderboard when data changes
+        useEffect(() => {
+          if (people.length > 0) {
+            recalculateLeaderboard(history);
           }
-        };
+        }, [history, people, tasks, dishwasherLogs, recalculateLeaderboard]);
 
-        const canEmptyDishwasherToday = () => {
+        const updateDishwasherLogs = useCallback(
+          async (newLogs) => {
+            try {
+              await retryWithBackoff(() =>
+                database.ref("dishwasherLogs").set(newLogs)
+              );
+              // Recalculate leaderboard when dishwasher points change
+              // Pass the new logs directly since state hasn't updated yet
+              await recalculateLeaderboard(history, newLogs);
+            } catch (error) {
+              handleFirebaseError(error, "vaatwasser logs bijwerken");
+            }
+          },
+          [history, recalculateLeaderboard]
+        );
+
+        const canEmptyDishwasherToday = useCallback(() => {
           if (trackedWeek < currentCalendarWeek) {
             return false;
           }
 
-          const today = new Date().toDateString();
+          const today = currentDate.toDateString();
           const todayLogs = dishwasherLogs.filter((log) => {
             const logDate = new Date(log.timestamp).toDateString();
             return (
@@ -2668,15 +2711,21 @@
             );
           });
           return todayLogs.length === 0;
-        };
+        }, [
+          trackedWeek,
+          currentCalendarWeek,
+          currentDate,
+          dishwasherLogs,
+          currentUser,
+        ]);
 
-        const getDishwasherCountThisWeek = () => {
+        const getDishwasherCountThisWeek = useCallback(() => {
           return dishwasherLogs.filter((log) => log.weekNumber === trackedWeek)
             .length;
-        };
+        }, [dishwasherLogs, trackedWeek]);
 
-        const getLastDishwasherLog = () => {
-          const today = new Date().toDateString();
+        const getLastDishwasherLog = useCallback(() => {
+          const today = currentDate.toDateString();
           const todayLogs = dishwasherLogs.filter((log) => {
             const logDate = new Date(log.timestamp).toDateString();
             return logDate === today && log.weekNumber === trackedWeek;
@@ -2687,18 +2736,18 @@
           // Get most recent
           const sorted = todayLogs.sort((a, b) => b.timestamp - a.timestamp);
           return sorted[0];
-        };
+        }, [currentDate, dishwasherLogs, trackedWeek]);
 
-        const handleDishwasherClick = () => {
+        const handleDishwasherClick = useCallback(() => {
           if (canEmptyDishwasherToday()) {
             setShowDishwasherConfirm(true);
           }
-        };
+        }, [canEmptyDishwasherToday]);
 
-        const confirmDishwasher = () => {
+        const confirmDishwasher = useCallback(() => {
           const newLog = {
             user: currentUser,
-            timestamp: Date.now(),
+            timestamp: currentDate.getTime(),
             weekNumber: trackedWeek,
             points: dishwasherPoints,
           };
@@ -2711,7 +2760,15 @@
             true
           );
           setShowDishwasherConfirm(false);
-        };
+        }, [
+          currentUser,
+          currentDate,
+          trackedWeek,
+          dishwasherPoints,
+          dishwasherLogs,
+          updateDishwasherLogs,
+          logActivity,
+        ]);
 
         const cancelDishwasher = () => {
           setShowDishwasherConfirm(false);
@@ -2720,9 +2777,9 @@
         // Auto-Archive Effect
         useEffect(() => {
           checkAndArchiveOldWeeks();
-        }, [trackedWeek, history, tasks, taskDefinitions]);
+        }, [checkAndArchiveOldWeeks]);
 
-        // Auto-advance to current week effect (only on initial load)
+        // Auto-advance to current week effect (runs on load and when calendar week changes)
         useEffect(() => {
           const autoAdvanceWeek = async () => {
             // Only run if not loading and tracked week is behind current week
@@ -2735,119 +2792,71 @@
             }
           };
 
-          // Run only once when loading completes
+          // Run when loading completes or when current calendar week changes
           if (!isLoading) {
             autoAdvanceWeek();
           }
-        }, [isLoading]);
+        }, [
+          isLoading,
+          trackedWeek,
+          currentCalendarWeek,
+          checkAndArchiveOldWeeks,
+        ]);
 
         // Business Logic Functions with retry support
-        const logActivity = async (action, task, status) => {
-          const activity = {
-            user: currentUser,
-            action: action,
-            task: task,
-            status: status,
-            timestamp: Date.now(),
-            weekNumber: trackedWeek,
-          };
-          const newActivity = [activity, ...activityLog].slice(
-            0,
-            ACTIVITY_LOG_LIMIT
-          );
-
-          try {
-            await retryWithBackoff(() =>
-              database.ref("activity").set(newActivity)
+        const logActivity = useCallback(
+          async (action, task, status) => {
+            const activity = {
+              user: currentUser,
+              action: action,
+              task: task,
+              status: status,
+              timestamp: Date.now(),
+              weekNumber: trackedWeek,
+            };
+            const newActivity = [activity, ...activityLog].slice(
+              0,
+              ACTIVITY_LOG_LIMIT
             );
-          } catch (error) {
-            handleFirebaseError(error, "activiteit opslaan");
-          }
-        };
 
-        const updateTasks = async (newTasks) => {
-          try {
-            await retryWithBackoff(() =>
-              database.ref(`tasksByWeek/${trackedWeek}`).set(newTasks)
-            );
-          } catch (error) {
-            handleFirebaseError(error, "taken bijwerken");
-          }
-        };
+            try {
+              await retryWithBackoff(() =>
+                database.ref("activity").set(newActivity)
+              );
+            } catch (error) {
+              handleFirebaseError(error, "activiteit opslaan");
+            }
+          },
+          [currentUser, trackedWeek, activityLog]
+        );
 
-        const updateHistory = async (newHistory) => {
-          try {
-            await retryWithBackoff(() =>
-              database.ref("history").set(newHistory)
-            );
-            // Recalculate and save leaderboard whenever history changes
-            await recalculateLeaderboard(newHistory);
-          } catch (error) {
-            handleFirebaseError(error, "geschiedenis bijwerken");
-          }
-        };
+        const updateTasks = useCallback(
+          async (newTasks) => {
+            try {
+              await retryWithBackoff(() =>
+                database.ref(`tasksByWeek/${trackedWeek}`).set(newTasks)
+              );
+            } catch (error) {
+              handleFirebaseError(error, "taken bijwerken");
+            }
+          },
+          [trackedWeek]
+        );
 
-        const recalculateLeaderboard = async (historyData) => {
-          try {
-            // Calculate leaderboard scores from history
-            const scores = {};
-
-            people.forEach((person) => {
-              scores[person] = {
-                name: person,
-                onTimeTasks: 0,
-                lateTasks: 0,
-                dishwasherPoints: 0,
-                totalPoints: 0,
-              };
-            });
-
-            // Calculate points from history
-            historyData.forEach((week) => {
-              people.forEach((person) => {
-                const personTasks = Object.entries(week.assignments).filter(
-                  ([_, assignedPerson]) => assignedPerson === person
-                );
-
-                personTasks.forEach(([taskId]) => {
-                  const taskPoints = week.taskPoints?.[taskId] || 1.0;
-
-                  if (week.tasks[taskId]) {
-                    const isLate =
-                      week.lateTasks && week.lateTasks.includes(taskId);
-                    if (isLate) {
-                      scores[person].lateTasks += taskPoints * 0.5;
-                    } else {
-                      scores[person].onTimeTasks += taskPoints;
-                    }
-                  }
-                });
-              });
-            });
-
-            // Add dishwasher points
-            dishwasherLogs.forEach((log) => {
-              if (scores[log.user]) {
-                scores[log.user].dishwasherPoints += log.points;
-              }
-            });
-
-            // Calculate total points
-            Object.keys(scores).forEach((person) => {
-              scores[person].totalPoints =
-                scores[person].onTimeTasks +
-                scores[person].lateTasks +
-                scores[person].dishwasherPoints;
-            });
-
-            // Save to Firebase
-            await retryWithBackoff(() =>
-              database.ref("leaderboard").set(scores)
-            );
-          } catch (error) {
-            console.error("Error recalculating leaderboard:", error);
-          }
-        };
+        const updateHistory = useCallback(
+          async (newHistory) => {
+            try {
+              await retryWithBackoff(() =>
+                database.ref("history").set(newHistory)
+              );
+              // Recalculate and save leaderboard whenever history changes
+              await recalculateLeaderboard(newHistory);
+            } catch (error) {
+              handleFirebaseError(error, "geschiedenis bijwerken");
+            }
+          },
+          [recalculateLeaderboard]
+        );
 
         const updatePeople = async (newPeople) => {
           try {
@@ -2908,14 +2917,14 @@
           taskDefinitions.forEach((taskDef) => {
             const assignedPeople = taskDef.assignedPeople || [];
 
-            if (assignedPeople.length > 1) {
+            if (assignedPeople.length === 0) {
+              result[taskDef.id] = "Niemand";
+            } else if (assignedPeople.length === 1) {
+              result[taskDef.id] = assignedPeople[0];
+            } else {
               const offset = rotationOffsets[taskDef.id] || 0;
               const index = (trackedWeek - 1 + offset) % assignedPeople.length;
               result[taskDef.id] = assignedPeople[index];
-            } else if (assignedPeople.length > 0) {
-              result[taskDef.id] = assignedPeople[0];
-            } else {
-              result[taskDef.id] = "Niemand";
             }
           });
           return result;
@@ -2923,7 +2932,16 @@
 
         const assignments = getAssignments();
 
-        const toggleTask = (taskId) => {
+        const toggleTask = async (taskId) => {
+          console.log("🎯 TOGGLING TASK", {
+            taskId,
+            currentStatus: tasks[taskId],
+            trackedWeek,
+            currentCalendarWeek,
+            isPast: trackedWeek < currentCalendarWeek,
+            isFuture: trackedWeek > currentCalendarWeek,
+          });
+
           const isPastWeek = trackedWeek < currentCalendarWeek;
           const isFutureWeek = trackedWeek > currentCalendarWeek;
 
@@ -2940,7 +2958,13 @@
             ...tasks,
             [taskId]: newStatus,
           };
-          updateTasks(newTasks);
+
+          // Update Firebase
+          await updateTasks(newTasks);
+
+          // Update local state immediately for instant feedback
+          setTasks(newTasks);
+
           const taskName =
             taskDefinitions.find((t) => t.id === taskId)?.name || taskId;
 
@@ -2986,7 +3010,7 @@
           );
         };
 
-        const checkAndArchiveOldWeeks = async () => {
+        const checkAndArchiveOldWeeks = useCallback(async () => {
           if (trackedWeek < currentCalendarWeek) {
             const alreadyCompleted = history.some(
               (week) =>
@@ -3001,22 +3025,24 @@
                   .once("value");
                 const weekTasks = weekTasksSnapshot.val() || {};
 
-                // Calculate assignments and snapshot task points for the archived week
+                // Calculate assignments and snapshot task points
                 const archivedAssignments = {};
                 const archivedTaskPoints = {};
+
                 taskDefinitions.forEach((taskDef) => {
                   const assignedPeople = taskDef.assignedPeople || [];
-                  if (assignedPeople.length > 1) {
+
+                  if (assignedPeople.length === 0) {
+                    archivedAssignments[taskDef.id] = "Niemand";
+                  } else if (assignedPeople.length === 1) {
+                    archivedAssignments[taskDef.id] = assignedPeople[0];
+                  } else {
                     const offset = rotationOffsets[taskDef.id] || 0;
                     const index =
                       (trackedWeek - 1 + offset) % assignedPeople.length;
                     archivedAssignments[taskDef.id] = assignedPeople[index];
-                  } else if (assignedPeople.length > 0) {
-                    archivedAssignments[taskDef.id] = assignedPeople[0];
-                  } else {
-                    archivedAssignments[taskDef.id] = "Niemand";
                   }
-                  // Snapshot the point value at time of archiving
+
                   archivedTaskPoints[taskDef.id] = taskDef.points || 1.0;
                 });
 
@@ -3048,7 +3074,16 @@
               }
             }
           }
-        };
+        }, [
+          trackedWeek,
+          currentCalendarWeek,
+          history,
+          currentYear,
+          taskDefinitions,
+          rotationOffsets,
+          updateHistory,
+          logActivity,
+        ]);
 
         const adjustWeek = (increment) => {
           const newWeek = Math.max(
@@ -3097,6 +3132,7 @@
                   trackedWeek={trackedWeek}
                   currentYear={currentYear}
                   currentCalendarWeek={currentCalendarWeek}
+                  currentDate={currentDate}
                   taskDefinitions={taskDefinitions}
                   tasks={tasks}
                   assignments={assignments}
@@ -3127,6 +3163,12 @@
                   activityLog={activityLog}
                   taskDefinitions={taskDefinitions}
                   dishwasherLogs={dishwasherLogs}
+                  storedLeaderboard={storedLeaderboard}
+                  tasks={tasks}
+                  rotationOffsets={rotationOffsets}
+                  trackedWeek={trackedWeek}
+                  currentCalendarWeek={currentCalendarWeek}
+                  currentYear={currentYear}
                 />
               )}
               {currentView === "history" && (
@@ -3162,6 +3204,8 @@
                   setCurrentView={setCurrentView}
                   currentUser={currentUser}
                   activityLog={activityLog}
+                  testDate={testDate}
+                  setTestDate={setTestDate}
                 />
               )}
 
